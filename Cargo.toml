@@ -38,6 +38,7 @@ secp256k1 = { version = "0.30", features = ["global-context"] }
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
+bs58 = "0.5"
 rmp-serde = "1.3"
 
 # Utils

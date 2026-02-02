@@ -65,10 +65,10 @@ impl HiveStateSnapshot {
         last_snapshot_hash: &str,
     ) -> Result<StateChannelSnapshotBinary> {
         let content = self.to_bytes()?;
-        Ok(StateChannelSnapshotBinary {
-            last_snapshot_hash: last_snapshot_hash.to_string(),
+        Ok(StateChannelSnapshotBinary::from_unsigned(
+            last_snapshot_hash.to_string(),
             content,
-        })
+        ))
     }
 }
 
@@ -167,6 +167,6 @@ mod tests {
 
         let binary = snapshot.to_state_channel_binary("previous_hash_here").unwrap();
         assert_eq!(binary.last_snapshot_hash, "previous_hash_here");
-        assert!(!binary.content.is_empty());
+        assert!(!binary.content_unsigned().is_empty());
     }
 }

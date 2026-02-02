@@ -10,12 +10,9 @@ use serde::{Deserialize, Serialize};
 pub struct Address(pub String);
 
 impl Address {
-    /// Create an address from a hex-encoded public key.
-    /// Reality addresses are derived: SHA256(pubkey) → BASE58 with "NET" prefix.
-    pub fn from_public_key(pubkey_hex: &str) -> Self {
-        // TODO: implement proper address derivation
-        // For now, placeholder
-        Address(format!("NET{}", &pubkey_hex[..40]))
+    /// Create an address directly from a string.
+    pub fn new(addr: &str) -> Self {
+        Address(addr.to_string())
     }
 }
 
@@ -55,9 +52,11 @@ impl TransactionReference {
     }
 }
 
-/// A cryptographic signature (hex-encoded).
+/// A signature proof — matches Reality's SignatureProof.
+/// `id` = uncompressed public key x||y (128 hex chars, no 04 prefix).
+/// `signature` = DER-encoded ECDSA signature (hex).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Signature {
+pub struct SignatureProof {
     pub id: String,
     pub signature: String,
 }
@@ -66,21 +65,39 @@ pub struct Signature {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Signed<T: Serialize> {
     pub value: T,
-    pub proofs: Vec<Signature>,
+    pub proofs: Vec<SignatureProof>,
 }
 
 /// State channel snapshot binary — the core type for submitting
 /// rApp state to the L0 network.
 ///
 /// Maps to: org.reality.statechannel.StateChannelSnapshotBinary
+/// Content is serialized as a JSON array of SIGNED byte values [-128..127]
+/// to match Circe's Array[Byte] encoding (Java bytes are signed).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StateChannelSnapshotBinary {
     /// Hash of the previous snapshot (chain integrity).
     pub last_snapshot_hash: String,
     /// Opaque content bytes — Hive serializes its own state here.
-    #[serde(with = "base64_bytes")]
-    pub content: Vec<u8>,
+    /// Uses i8 to match Java's signed Byte type in Circe serialization.
+    pub content: Vec<i8>,
+}
+
+impl StateChannelSnapshotBinary {
+    /// Create from unsigned bytes (converts u8 → i8 for Java compatibility).
+    pub fn from_unsigned(last_snapshot_hash: String, content: Vec<u8>) -> Self {
+        let signed_content: Vec<i8> = content.into_iter().map(|b| b as i8).collect();
+        Self {
+            last_snapshot_hash,
+            content: signed_content,
+        }
+    }
+
+    /// Get content as unsigned bytes.
+    pub fn content_unsigned(&self) -> Vec<u8> {
+        self.content.iter().map(|&b| b as u8).collect()
+    }
 }
 
 /// State channel output — wraps a signed snapshot with its address.
@@ -147,23 +164,5 @@ pub struct GlobalSnapshotOrdinal {
     pub value: u64,
 }
 
-/// Base64 encoding for binary content in JSON.
-mod base64_bytes {
-    use base64::{engine::general_purpose::STANDARD, Engine};
-    use serde::{self, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&STANDARD.encode(bytes))
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        STANDARD.decode(&s).map_err(serde::de::Error::custom)
-    }
-}
+// Note: Vec<u8> with serde's default serialization produces a JSON array
+// of integers [1,2,3,...] which matches Reality's Circe Array[Byte] encoding.
