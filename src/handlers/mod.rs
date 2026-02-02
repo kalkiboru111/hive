@@ -134,39 +134,100 @@ pub async fn route_message(
     Ok(HandlerResult::Reply(config.business.welcome.clone()))
 }
 
-/// Route an admin message. Tries admin commands first, falls back to regular routing.
+/// Route an admin message. Checks for mode toggle, then dispatches based on state.
 pub async fn route_admin_message(
     config: &HiveConfig,
     ctx: &MessageContext,
     state: &mut ConversationState,
     store: &Store,
 ) -> Result<HandlerResult> {
-    let text = ctx.text.trim().to_uppercase();
+    let text = ctx.text.trim();
+    let text_upper = text.to_uppercase();
 
-    // Admin commands
-    if text.starts_with("DONE ") {
-        // Mark order as delivered: "DONE 42"
-        if let Ok(order_id) = text[5..].trim().parse::<i64>() {
+    // Toggle: "ADMIN" enters admin mode from any state
+    if text_upper == "ADMIN" {
+        *state = ConversationState::AdminMode;
+        return Ok(HandlerResult::Reply(format!(
+            "🔧 *Admin Mode*\n\n\
+             1. 📋 Pending Orders\n\
+             2. 📊 Stats\n\
+             3. 🎟️ Create Voucher\n\n\
+             Or type:\n\
+             • DONE <id> — mark order delivered\n\
+             • VOUCHER <amount> — create voucher\n\n\
+             Type EXIT to return to customer view."
+        )));
+    }
+
+    // Toggle: "EXIT" leaves admin mode
+    if matches!(state, ConversationState::AdminMode) && (text_upper == "EXIT" || text == "0") {
+        *state = ConversationState::Idle;
+        return Ok(HandlerResult::Reply(config.business.welcome.clone()));
+    }
+
+    // If in admin mode, route numbers and commands to admin handlers
+    if matches!(state, ConversationState::AdminMode) {
+        // Number shortcuts
+        match text {
+            "1" => return handle_admin_orders(config, store).await,
+            "2" => return handle_admin_stats(config, store).await,
+            "3" => {
+                return Ok(HandlerResult::Reply(
+                    "🎟️ Type: VOUCHER <amount>\nExample: VOUCHER 50".to_string(),
+                ));
+            }
+            _ => {}
+        }
+
+        // Text commands (also work outside admin mode)
+        if text_upper.starts_with("DONE ") {
+            if let Ok(order_id) = text_upper[5..].trim().parse::<i64>() {
+                return handle_admin_done(config, ctx, store, order_id).await;
+            }
+        }
+        if text_upper.starts_with("VOUCHER ") {
+            if let Ok(amount) = text_upper[8..].trim().parse::<f64>() {
+                return handle_admin_create_voucher(config, store, amount).await;
+            }
+        }
+        if text_upper == "ORDERS" || text_upper == "PENDING" {
+            return handle_admin_orders(config, store).await;
+        }
+        if text_upper == "STATS" {
+            return handle_admin_stats(config, store).await;
+        }
+
+        // Unknown admin command — show help
+        return Ok(HandlerResult::Reply(
+            "🔧 Admin commands:\n\
+             1 — Pending Orders\n\
+             2 — Stats\n\
+             3 — Create Voucher\n\
+             DONE <id> — Mark delivered\n\
+             EXIT — Back to customer view"
+                .to_string(),
+        ));
+    }
+
+    // Not in admin mode — try uppercase text commands (backwards compat)
+    if text_upper.starts_with("DONE ") {
+        if let Ok(order_id) = text_upper[5..].trim().parse::<i64>() {
             return handle_admin_done(config, ctx, store, order_id).await;
         }
     }
-
-    if text.starts_with("VOUCHER ") {
-        // Create voucher: "VOUCHER 50" creates a R50 voucher
-        if let Ok(amount) = text[8..].trim().parse::<f64>() {
+    if text_upper.starts_with("VOUCHER ") {
+        if let Ok(amount) = text_upper[8..].trim().parse::<f64>() {
             return handle_admin_create_voucher(config, store, amount).await;
         }
     }
-
-    if text == "ORDERS" || text == "PENDING" {
+    if text_upper == "ORDERS" || text_upper == "PENDING" {
         return handle_admin_orders(config, store).await;
     }
-
-    if text == "STATS" {
+    if text_upper == "STATS" {
         return handle_admin_stats(config, store).await;
     }
 
-    // Fall through to regular handler chain
+    // Fall through to regular customer handler chain
     route_message(config, ctx, state, store).await
 }
 

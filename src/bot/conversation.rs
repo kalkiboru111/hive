@@ -109,6 +109,9 @@ pub enum ConversationState {
 
     /// User is entering a voucher code.
     RedeemingVoucher,
+
+    /// Admin mode — admin commands routed by number instead of text prefix.
+    AdminMode,
 }
 
 impl Default for ConversationState {
@@ -137,6 +140,7 @@ impl ConversationState {
             Self::ConfirmingOrder(_) => "confirming_order",
             Self::AwaitingLocation(_) => "awaiting_location",
             Self::RedeemingVoucher => "redeeming_voucher",
+            Self::AdminMode => "admin_mode",
         }
     }
 

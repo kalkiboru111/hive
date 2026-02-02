@@ -241,18 +241,20 @@ async fn handle_incoming_message(
         chat_jid: wa_ctx.info.source.chat.clone(),
     };
 
-    // Check for cancel/reset commands
-    if text.eq_ignore_ascii_case("cancel")
-        || text.eq_ignore_ascii_case("0")
-        || text.eq_ignore_ascii_case("home")
-        || text.eq_ignore_ascii_case("hi")
-        || text.eq_ignore_ascii_case("hello")
-    {
-        if state.is_in_order_flow() || !matches!(state, ConversationState::Idle) {
-            state.reset();
-            send_text_reply(&ctx, &config.business.welcome).await?;
-            store.save_conversation_state(&sender, &state.to_json())?;
-            return Ok(());
+    // Check for cancel/reset commands (but not when in AdminMode — let the admin router handle it)
+    if !matches!(state, ConversationState::AdminMode) {
+        if text.eq_ignore_ascii_case("cancel")
+            || text.eq_ignore_ascii_case("0")
+            || text.eq_ignore_ascii_case("home")
+            || text.eq_ignore_ascii_case("hi")
+            || text.eq_ignore_ascii_case("hello")
+        {
+            if state.is_in_order_flow() || !matches!(state, ConversationState::Idle) {
+                state.reset();
+                send_text_reply(&ctx, &config.business.welcome).await?;
+                store.save_conversation_state(&sender, &state.to_json())?;
+                return Ok(());
+            }
         }
     }
 
