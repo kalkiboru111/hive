@@ -208,7 +208,13 @@ impl HiveConfig {
 
     /// Check if a phone number is an admin.
     pub fn is_admin(&self, phone: &str) -> bool {
-        self.admin_numbers.iter().any(|n| n == phone)
+        // Strip non-digits from both sides for comparison
+        // Config might have "+14152657184", sender might be "14152657184@s.whatsapp.net"
+        let phone_digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+        self.admin_numbers.iter().any(|n| {
+            let n_digits: String = n.chars().filter(|c| c.is_ascii_digit()).collect();
+            n_digits == phone_digits
+        })
     }
 
     /// Get available menu items only.
