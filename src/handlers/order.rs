@@ -304,7 +304,7 @@ async fn handle_location_input(
     // Build notification for admin(s)
     let currency = &config.business.currency;
     let items_display = order.items_display(currency);
-    let _admin_msg = MessageTemplates::render(
+    let admin_msg = MessageTemplates::render(
         &config.messages.order_received_admin,
         &[
             ("id", &order_id.to_string()),
@@ -315,11 +315,27 @@ async fn handle_location_input(
         ],
     );
 
-    // TODO: Send admin notification via WhatsApp to each admin number
-    // for admin_number in &config.admin_numbers {
-    //     let admin_jid = Jid::from_string(admin_number);
-    //     ctx.wa_client.send_message(admin_jid, admin_msg_wa).await?;
-    // }
+    // Send admin notification via WhatsApp
+    for admin_number in &config.admin_numbers {
+        let clean_number: String = admin_number.chars().filter(|c| c.is_ascii_digit()).collect();
+        if !clean_number.is_empty() {
+            let admin_jid = wacore_binary::jid::Jid::pn(&clean_number);
+            let admin_wa_msg = waproto::whatsapp::Message {
+                extended_text_message: Some(Box::new(
+                    waproto::whatsapp::message::ExtendedTextMessage {
+                        text: Some(admin_msg.clone()),
+                        ..Default::default()
+                    },
+                )),
+                ..Default::default()
+            };
+            if let Err(e) = ctx.wa_client.send_message(admin_jid, admin_wa_msg).await {
+                log::error!("Failed to notify admin {}: {}", admin_number, e);
+            } else {
+                log::info!("📢 Notified admin {} about order #{}", admin_number, order_id);
+            }
+        }
+    }
 
     log::info!(
         "📦 New order #{} from {} — {}{:.2} — {}",

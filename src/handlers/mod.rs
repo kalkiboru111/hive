@@ -212,7 +212,7 @@ async fn handle_my_orders(
 /// Admin: mark an order as delivered.
 async fn handle_admin_done(
     config: &HiveConfig,
-    _ctx: &MessageContext,
+    ctx: &MessageContext,
     store: &Store,
     order_id: i64,
 ) -> Result<HandlerResult> {
@@ -222,16 +222,38 @@ async fn handle_admin_done(
             store.update_order_status(order_id, &crate::store::OrderStatus::Delivered)?;
 
             // Format the delivery notification for the customer
-            let _msg = crate::config::MessageTemplates::render(
+            let msg = crate::config::MessageTemplates::render(
                 &config.messages.order_delivered,
                 &[("id", &order_id.to_string())],
             );
 
-            // TODO: Send delivery notification to customer via WhatsApp
-            // ctx.wa_client.send_message(customer_jid, message).await?;
+            // Send delivery notification to customer via WhatsApp
+            let clean_number: String = order.customer_phone
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .collect();
+            if !clean_number.is_empty() {
+                let customer_jid = wacore_binary::jid::Jid::pn(&clean_number);
+                let wa_msg = waproto::whatsapp::Message {
+                    extended_text_message: Some(Box::new(
+                        waproto::whatsapp::message::ExtendedTextMessage {
+                            text: Some(msg),
+                            ..Default::default()
+                        },
+                    )),
+                    ..Default::default()
+                };
+                if let Err(e) = ctx.wa_client.send_message(customer_jid, wa_msg).await {
+                    log::error!("Failed to notify customer {}: {}", order.customer_phone, e);
+                    return Ok(HandlerResult::Reply(format!(
+                        "✅ Order #{} marked as delivered.\n⚠️ Failed to notify customer: {}",
+                        order_id, e
+                    )));
+                }
+            }
 
             Ok(HandlerResult::Reply(format!(
-                "✅ Order #{} marked as delivered.\nCustomer {} will be notified.",
+                "✅ Order #{} marked as delivered.\n📨 Customer {} has been notified.",
                 order_id, order.customer_phone
             )))
         }
