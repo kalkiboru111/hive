@@ -1,0 +1,60 @@
+# Cloudy Deliveries — Township Food Delivery Bot
+# A complete example showing all Hive configuration options.
+
+business:
+  name: "Cloudy Deliveries"
+  currency: "ZAR"
+  welcome: |
+    Welcome to Cloudy Deliveries! 🍔☁️
+
+    Reply with a number:
+    1. 📋 View Menu
+    2. 📦 My Orders
+    3. 🎟️ Redeem Voucher
+    4. ℹ️ About Us
+  about: "Cloudy Deliveries brings the best township food to your door. Fast, fresh, local. ☁️"
+
+menu:
+  - name: "Kota"
+    price: 35.00
+    emoji: "🌯"
+    description: "Classic township kota - chips, polony, atchar, cheese"
+  - name: "Bunny Chow"
+    price: 45.00
+    emoji: "🍛"
+    description: "Half loaf filled with curry"
+  - name: "Pap & Vleis"
+    price: 50.00
+    emoji: "🍖"
+    description: "Pap with braai meat and chakalaka"
+  - name: "Gatsby"
+    price: 60.00
+    emoji: "🥖"
+    description: "Loaded steak gatsby with chips and sauce"
+  - name: "Vetkoek"
+    price: 25.00
+    emoji: "🫓"
+    description: "Fried dough filled with mince"
+  - name: "Magwinya & Chips"
+    price: 20.00
+    emoji: "🍟"
+    description: "Fat cakes with chips"
+
+delivery:
+  fee: 10.00
+  estimate_minutes: [30, 45]
+
+admin_numbers:
+  - "+27XXXXXXXXXX"
+
+messages:
+  order_confirmed: "✅ Order #{id} confirmed!\n📍 Send your location or address\n⏱ Estimated delivery: {estimate}"
+  order_received_admin: "🔔 New Order #{id}\n{items}\nTotal: {currency}{total}\n📍 {location}\nReply DONE {id} when delivered"
+  order_delivered: "🎉 Order #{id} has been delivered! Enjoy your meal!\nRate us: ⭐⭐⭐⭐⭐"
+  voucher_created: "🎟️ Voucher created: {code} — {currency}{amount}"
+  voucher_redeemed: "✅ Voucher {code} redeemed! {currency}{amount} off your next order."
+  voucher_invalid: "❌ That voucher code is invalid or already used."
+
+dashboard:
+  port: 8080
+  enabled: true

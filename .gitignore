@@ -1,0 +1,17 @@
+# Build
+/target/
+
+# Runtime data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

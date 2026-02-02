@@ -1,0 +1,42 @@
+# Hive Bot Configuration
+# Edit this file to customize your WhatsApp bot.
+# See examples/cloudy-deliveries/config.yaml for a complete example.
+
+business:
+  name: "My Business"
+  currency: "USD"
+  welcome: |
+    Welcome! 👋
+
+    Reply with a number:
+    1. 📋 View Menu
+    2. 📦 My Orders
+    3. 🎟️ Redeem Voucher
+    4. ℹ️ About Us
+
+menu:
+  - name: "Item 1"
+    price: 10.00
+    emoji: "🍕"
+    description: "Your first menu item"
+  - name: "Item 2"
+    price: 15.00
+    emoji: "🍔"
+    description: "Your second menu item"
+
+# Uncomment and configure delivery settings:
+# delivery:
+#   fee: 5.00
+#   estimate_minutes: [30, 45]
+
+# WhatsApp numbers that receive order notifications:
+admin_numbers: []
+
+# Customize bot response messages (supports {id}, {items}, {total}, {currency}, {location}, {estimate}, {code}, {amount} placeholders):
+# messages:
+#   order_confirmed: "✅ Order #{id} confirmed! Send your location."
+#   order_delivered: "🎉 Order #{id} delivered! Enjoy!"
+
+dashboard:
+  port: 8080
+  enabled: true
