@@ -10,6 +10,7 @@ mod bot;
 mod config;
 mod dashboard;
 mod handlers;
+pub mod network;
 mod store;
 mod vouchers;
 
