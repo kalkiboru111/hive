@@ -20,6 +20,8 @@ pub struct HiveConfig {
     pub messages: MessageTemplates,
     #[serde(default)]
     pub dashboard: DashboardConfig,
+    #[serde(default)]
+    pub network: NetworkConfig,
 }
 
 /// Business identity and messaging.
@@ -157,6 +159,46 @@ impl Default for DashboardConfig {
 
 fn default_port() -> u16 {
     8080
+}
+
+/// Reality Network integration configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkConfig {
+    /// Whether to submit state snapshots to Reality Network.
+    #[serde(default)]
+    pub enabled: bool,
+    /// L0 node URL (e.g., "http://localhost:7000").
+    #[serde(default = "default_l0_url")]
+    pub l0_url: String,
+    /// Path to the node identity file (generated on first run).
+    #[serde(default = "default_identity_path")]
+    pub identity_path: String,
+    /// Minimum seconds between snapshot submissions (rate limiting).
+    #[serde(default = "default_snapshot_interval")]
+    pub snapshot_interval_secs: u64,
+}
+
+fn default_l0_url() -> String {
+    "http://localhost:9000".to_string()
+}
+
+fn default_identity_path() -> String {
+    "data/identity.json".to_string()
+}
+
+fn default_snapshot_interval() -> u64 {
+    30
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            l0_url: default_l0_url(),
+            identity_path: default_identity_path(),
+            snapshot_interval_secs: default_snapshot_interval(),
+        }
+    }
 }
 
 impl MessageTemplates {

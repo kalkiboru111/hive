@@ -11,6 +11,7 @@ pub mod conversation;
 
 use crate::config::HiveConfig;
 use crate::handlers::{self, HandlerResult, MessageContext};
+use crate::network::service::{NetworkNotifier, NetworkService};
 use crate::store::Store;
 use anyhow::Result;
 use conversation::ConversationState;
@@ -30,16 +31,39 @@ pub struct BotEngine {
     store: Store,
     project_dir: PathBuf,
     phone_number: Option<String>,
+    network_notifier: NetworkNotifier,
 }
 
 impl BotEngine {
     /// Create a new bot engine.
     pub async fn new(config: HiveConfig, store: Store, project_dir: PathBuf) -> Result<Self> {
+        // Initialize Reality Network integration if enabled
+        let network_notifier = if config.network.enabled {
+            let (service, notifier) = NetworkService::new(
+                &config.network,
+                store.clone(),
+                config.business.name.clone(),
+                &project_dir,
+            )
+            .await?;
+
+            // Spawn the network service as a background task
+            tokio::spawn(async move {
+                service.run().await;
+            });
+
+            notifier
+        } else {
+            info!("🌐 Reality Network integration disabled (set network.enabled: true to enable)");
+            NetworkNotifier::disabled()
+        };
+
         Ok(Self {
             config: Arc::new(config),
             store,
             project_dir,
             phone_number: None,
+            network_notifier,
         })
     }
 
@@ -67,6 +91,7 @@ impl BotEngine {
         // Build shared state for the event handler closure
         let config = self.config.clone();
         let store = self.store.clone();
+        let network_notifier = self.network_notifier.clone();
 
         let mut builder = Bot::builder()
             .with_backend(backend)
@@ -86,6 +111,7 @@ impl BotEngine {
             .on_event(move |event, client| {
                 let config = config.clone();
                 let store = store.clone();
+                let network_notifier = network_notifier.clone();
                 async move {
                     match event {
                         Event::PairingQrCode { code, timeout } => {
@@ -148,13 +174,18 @@ impl BotEngine {
                                 client: client.clone(),
                             };
 
-                            if let Err(e) =
-                                handle_incoming_message(&config, &store, &wa_ctx).await
-                            {
-                                error!(
-                                    "Error handling message from {}: {}",
-                                    info.source.sender, e
-                                );
+                            match handle_incoming_message(&config, &store, &wa_ctx).await {
+                                Ok(state_changed) => {
+                                    if state_changed {
+                                        network_notifier.mark_dirty();
+                                    }
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Error handling message from {}: {}",
+                                        info.source.sender, e
+                                    );
+                                }
                             }
                         }
                         _ => {
@@ -178,6 +209,9 @@ impl BotEngine {
 
 /// Handle a single incoming WhatsApp message.
 ///
+/// Returns Ok(true) if store state changed (order/voucher), triggering
+/// a Reality Network snapshot submission.
+///
 /// This is the core routing logic:
 /// 1. Extract text from the message
 /// 2. Load conversation state for this sender
@@ -187,7 +221,7 @@ async fn handle_incoming_message(
     config: &HiveConfig,
     store: &Store,
     wa_ctx: &WaMessageContext,
-) -> Result<()> {
+) -> Result<bool> {
     use wacore::proto_helpers::MessageExt;
 
     let sender = wa_ctx.info.source.sender.to_string();
@@ -195,7 +229,7 @@ async fn handle_incoming_message(
 
     // Skip messages from ourselves
     if is_from_me {
-        return Ok(());
+        return Ok(false);
     }
 
     // Extract text content from the message
@@ -213,7 +247,7 @@ async fn handle_incoming_message(
             || base_msg.live_location_message.is_some();
 
         if !has_location {
-            return Ok(());
+            return Ok(false);
         }
     }
 
@@ -253,7 +287,7 @@ async fn handle_incoming_message(
                 state.reset();
                 send_text_reply(&ctx, &config.business.welcome).await?;
                 store.save_conversation_state(&sender, &state.to_json())?;
-                return Ok(());
+                return Ok(false);
             }
         }
     }
@@ -267,6 +301,7 @@ async fn handle_incoming_message(
     };
 
     // Send response(s)
+    let state_changed = !matches!(result, HandlerResult::NoReply);
     match result {
         HandlerResult::Reply(text) => {
             send_text_reply(&ctx, &text).await?;
@@ -284,7 +319,7 @@ async fn handle_incoming_message(
     // Persist updated conversation state
     store.save_conversation_state(&sender, &state.to_json())?;
 
-    Ok(())
+    Ok(state_changed)
 }
 
 /// Extract a text representation of a location message.

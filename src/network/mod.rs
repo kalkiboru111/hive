@@ -13,5 +13,6 @@
 
 pub mod client;
 pub mod identity;
+pub mod service;
 pub mod snapshot;
 pub mod types;
