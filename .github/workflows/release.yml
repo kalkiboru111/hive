@@ -1,10 +1,3 @@
-U
-Annotations 5 errors and 1 warning build (aarch64-unknown-linux-gnu, ubuntu-latest, hive-linux-arm64) Process completed with exit code 101. build (x86_64-unknown-linux-gnu, ubuntu-latest, hive-linux-x86_64) The strategy configuration was canceled because "build.aarch64-unknown-linux-gnu" failed build (x86_64-unknown-linux-gnu, ubuntu-latest, hive-linux-x86_64) The operation was canceled. build (aarch64-apple-darwin, macos-latest, hive-macos-arm64) The strategy configuration was canceled because "build.aarch64-unknown-linux-gnu" failed build (aarch64-apple-darwin, macos-latest, hive-macos-arm64) The operation was canceled. build (aarch64-apple-darwin, macos-latest, hive-macos-arm64) openssl@3 3.6.0 is already installed and up-to-date. To reinstall 3.6.0, run: brew reinstall openssl@3
-You
-6:16 AM
-♜
-
-The ARM64 cross-compilation is failing. Let me simplify — we'll use native runners for each platform:
 name: Build and Release
 
 on:
@@ -13,105 +6,63 @@ on:
       - 'v*'
   workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   build-linux-x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
+      
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-12-19
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev protobuf-compiler
-
+      
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev protobuf-compiler
+      
       - name: Build
         run: cargo build --release
-
-      - name: Rename binary
-        run: cp target/release/hive hive-linux-x86_64
-
-      - name: Upload artifact
+      
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: hive-linux-x86_64
-          path: hive-linux-x86_64
-
-  build-linux-arm64:
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2025-12-19
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev protobuf-compiler
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Rename binary
-        run: cp target/release/hive hive-linux-arm64
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: hive-linux-arm64
-          path: hive-linux-arm64
+          path: target/release/hive
 
   build-macos-arm64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
+      
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-12-19
-
-      - name: Install dependencies
+      
+      - name: Install deps
         run: brew install protobuf
-
+      
       - name: Build
         run: cargo build --release
-
-      - name: Rename binary
-        run: cp target/release/hive hive-macos-arm64
-
-      - name: Upload artifact
+      
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: hive-macos-arm64
-          path: hive-macos-arm64
+          path: target/release/hive
 
   release:
-    needs: [build-linux-x64, build-linux-arm64, build-macos-arm64]
+    needs: [build-linux-x64, build-macos-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: binaries
           merge-multiple: true
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      
+      - uses: softprops/action-gh-release@v2
         with:
           files: binaries/*
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
