@@ -1,0 +1,24 @@
+# Multi-stage build for Hive Linux binaries
+FROM rust:1.84-bookworm AS builder
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create build directory
+WORKDIR /build
+
+# Copy source
+COPY . .
+
+# Install nightly toolchain
+RUN rustup toolchain install nightly-2025-12-19 && \
+    rustup default nightly-2025-12-19
+
+# Build release
+RUN cargo build --release
+
+# The binary will be at /build/target/release/hive

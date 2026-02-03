@@ -40,7 +40,7 @@ network:
 EOF
 
 # 4. Run
-./hive
+./hive run .
 ```
 
 ## Test Checklist

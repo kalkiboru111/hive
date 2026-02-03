@@ -23,9 +23,9 @@ curl -fsSL https://raw.githubusercontent.com/kalkiboru111/hive/main/setup.sh | b
 
 3. **Create config.yaml** (see [Configuration](#configuration) below)
 
-4. **Run Hive:**
+4. **Run Hive (from project directory):**
    ```bash
-   ./hive
+   ./hive run .
    ```
 
 5. **Scan the QR code** with WhatsApp (Link a Device)
@@ -88,7 +88,7 @@ dashboard:
 
 ### 1. Start Hive
 ```bash
-./hive
+./hive run .
 ```
 
 You'll see:
