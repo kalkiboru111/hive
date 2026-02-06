@@ -2,7 +2,7 @@
 //!
 //! Implements STK Push (Lipa na M-Pesa Online) for customer payments.
 
-use super::types::{PaymentStatus, Payment};
+use super::types::PaymentStatus;
 use super::PaymentProvider;
 use anyhow::{Result, Context, bail};
 use log::{info, warn};

@@ -15,7 +15,7 @@ use anyhow::Result;
 
 /// Payment provider trait
 #[async_trait::async_trait]
-pub trait PaymentProvider {
+pub trait PaymentProvider: Send + Sync {
     /// Initiate a payment request
     async fn initiate_payment(
         &self,

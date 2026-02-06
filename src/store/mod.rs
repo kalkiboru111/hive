@@ -4,6 +4,7 @@
 //! state. Uses rusqlite with a simple synchronous API (wrapped in `Arc` for sharing).
 
 use anyhow::{Context, Result};
+use crate::payments::{Payment, PaymentStatus};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
@@ -502,7 +503,7 @@ impl Store {
     }
 
     /// Get payment by ID.
-    pub fn get_payment(&self, payment_id: &str) -> Result<Option<crate::payments::Payment>> {
+    pub fn get_payment(&self, payment_id: &str) -> Result<Option<Payment>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, order_id, amount, currency, method, status, phone, reference, provider_ref, created_at, updated_at
@@ -510,19 +511,19 @@ impl Store {
         )?;
 
         let result = stmt.query_row(params![payment_id], |row| {
-                Ok(crate::payments::Payment {
+                Ok(Payment {
                     id: row.get(0)?,
                     order_id: row.get(1)?,
                     amount: row.get(2)?,
                     currency: row.get(3)?,
                     method: serde_json::from_str(&format!(r#""{}""#, row.get::<_, String>(4)?)).unwrap(),
                     status: match row.get::<_, String>(5)?.as_str() {
-                        "pending" => crate::payments::PaymentStatus::Pending,
-                        "processing" => crate::payments::PaymentStatus::Processing,
-                        "completed" => crate::payments::PaymentStatus::Completed,
-                        "failed" => crate::payments::PaymentStatus::Failed,
-                        "cancelled" => crate::payments::PaymentStatus::Cancelled,
-                        _ => crate::payments::PaymentStatus::Pending,
+                        "pending" => PaymentStatus::Pending,
+                        "processing" => PaymentStatus::Processing,
+                        "completed" => PaymentStatus::Completed,
+                        "failed" => PaymentStatus::Failed,
+                        "cancelled" => PaymentStatus::Cancelled,
+                        _ => PaymentStatus::Pending,
                     },
                     phone: row.get(6)?,
                     reference: row.get(7)?,
@@ -540,7 +541,7 @@ impl Store {
     }
 
     /// Get payments for an order.
-    pub fn get_order_payments(&self, order_id: i64) -> Result<Vec<crate::payments::Payment>> {
+    pub fn get_order_payments(&self, order_id: i64) -> Result<Vec<Payment>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, order_id, amount, currency, method, status, phone, reference, provider_ref, created_at, updated_at
@@ -549,19 +550,19 @@ impl Store {
 
         let payments = stmt
             .query_map(params![order_id], |row| {
-                Ok(crate::payments::Payment {
+                Ok(Payment {
                     id: row.get(0)?,
                     order_id: row.get(1)?,
                     amount: row.get(2)?,
                     currency: row.get(3)?,
                     method: serde_json::from_str(&format!(r#""{}""#, row.get::<_, String>(4)?)).unwrap(),
                     status: match row.get::<_, String>(5)?.as_str() {
-                        "pending" => crate::payments::PaymentStatus::Pending,
-                        "processing" => crate::payments::PaymentStatus::Processing,
-                        "completed" => crate::payments::PaymentStatus::Completed,
-                        "failed" => crate::payments::PaymentStatus::Failed,
-                        "cancelled" => crate::payments::PaymentStatus::Cancelled,
-                        _ => crate::payments::PaymentStatus::Pending,
+                        "pending" => PaymentStatus::Pending,
+                        "processing" => PaymentStatus::Processing,
+                        "completed" => PaymentStatus::Completed,
+                        "failed" => PaymentStatus::Failed,
+                        "cancelled" => PaymentStatus::Cancelled,
+                        _ => PaymentStatus::Pending,
                     },
                     phone: row.get(6)?,
                     reference: row.get(7)?,

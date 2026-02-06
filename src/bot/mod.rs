@@ -12,6 +12,7 @@ pub mod conversation;
 use crate::config::HiveConfig;
 use crate::handlers::{self, HandlerResult, MessageContext};
 use crate::network::service::{NetworkNotifier, NetworkService};
+use crate::payments::{MpesaClient, PaymentProvider};
 use crate::store::Store;
 use anyhow::Result;
 use conversation::ConversationState;
@@ -32,6 +33,7 @@ pub struct BotEngine {
     project_dir: PathBuf,
     phone_number: Option<String>,
     network_notifier: NetworkNotifier,
+    payment_provider: Option<Arc<dyn PaymentProvider>>,
 }
 
 impl BotEngine {
@@ -58,12 +60,35 @@ impl BotEngine {
             NetworkNotifier::disabled()
         };
 
+        // Initialize payment provider if configured
+        let payment_provider: Option<Arc<dyn PaymentProvider>> = if config.payments.enabled {
+            if let Some(ref mpesa_cfg) = config.payments.mpesa {
+                info!("💰 M-Pesa payments enabled ({})", 
+                      if mpesa_cfg.sandbox { "sandbox" } else { "production" });
+                let mpesa_config = crate::payments::mpesa::MpesaConfig {
+                    consumer_key: mpesa_cfg.consumer_key.clone(),
+                    consumer_secret: mpesa_cfg.consumer_secret.clone(),
+                    shortcode: mpesa_cfg.shortcode.clone(),
+                    passkey: mpesa_cfg.passkey.clone(),
+                    callback_url: mpesa_cfg.callback_url.clone(),
+                    sandbox: mpesa_cfg.sandbox,
+                };
+                Some(Arc::new(MpesaClient::new(mpesa_config)))
+            } else {
+                warn!("💰 Payments enabled but no provider configured");
+                None
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             config: Arc::new(config),
             store,
             project_dir,
             phone_number: None,
             network_notifier,
+            payment_provider,
         })
     }
 
@@ -92,6 +117,7 @@ impl BotEngine {
         let config = self.config.clone();
         let store = self.store.clone();
         let network_notifier = self.network_notifier.clone();
+        let payment_provider = self.payment_provider.clone();
 
         let mut builder = Bot::builder()
             .with_backend(backend)
@@ -112,6 +138,7 @@ impl BotEngine {
                 let config = config.clone();
                 let store = store.clone();
                 let network_notifier = network_notifier.clone();
+                let payment_provider = payment_provider.clone();
                 async move {
                     match event {
                         Event::PairingQrCode { code, timeout } => {
@@ -174,7 +201,7 @@ impl BotEngine {
                                 client: client.clone(),
                             };
 
-                            match handle_incoming_message(&config, &store, &wa_ctx).await {
+                            match handle_incoming_message(&config, &store, &wa_ctx, &payment_provider).await {
                                 Ok(state_changed) => {
                                     if state_changed {
                                         network_notifier.mark_dirty();
@@ -221,6 +248,7 @@ async fn handle_incoming_message(
     config: &HiveConfig,
     store: &Store,
     wa_ctx: &WaMessageContext,
+    payment_provider: &Option<Arc<dyn PaymentProvider>>,
 ) -> Result<bool> {
     use wacore::proto_helpers::MessageExt;
 
@@ -273,6 +301,7 @@ async fn handle_incoming_message(
         raw_message: wa_ctx.message.clone(),
         wa_client: wa_ctx.client.clone(),
         chat_jid: wa_ctx.info.source.chat.clone(),
+        payment_provider: payment_provider.clone(),
     };
 
     // Check for cancel/reset commands (but not when in AdminMode — let the admin router handle it)

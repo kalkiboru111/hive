@@ -10,6 +10,7 @@ pub mod voucher;
 
 use crate::bot::conversation::ConversationState;
 use crate::config::HiveConfig;
+use crate::payments::PaymentProvider;
 use crate::store::Store;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -37,6 +38,8 @@ pub struct MessageContext {
     pub wa_client: Arc<Client>,
     /// Chat JID to reply to
     pub chat_jid: Jid,
+    /// Payment provider (if configured)
+    pub payment_provider: Option<Arc<dyn PaymentProvider>>,
 }
 
 /// Result of handling a message.

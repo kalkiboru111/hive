@@ -10,7 +10,9 @@ mod bot;
 mod config;
 mod dashboard;
 mod handlers;
+mod i18n;
 pub mod network;
+mod payments;
 mod store;
 mod vouchers;
 

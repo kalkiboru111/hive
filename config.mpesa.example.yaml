@@ -1,0 +1,32 @@
+# Example M-Pesa Payment Integration Config
+# Copy this section into your config.yaml to enable M-Pesa payments
+
+payments:
+  enabled: true
+  mpesa:
+    # Get these from https://developer.safaricom.co.ke
+    consumer_key: "YOUR_CONSUMER_KEY_HERE"
+    consumer_secret: "YOUR_CONSUMER_SECRET_HERE"
+    
+    # Your M-Pesa Business Shortcode (Paybill or Till Number)
+    shortcode: "174379"  # Example shortcode
+    
+    # Lipa na M-Pesa Online Passkey (from Safaricom portal)
+    passkey: "YOUR_PASSKEY_HERE"
+    
+    # Callback URL (where M-Pesa sends payment confirmations)
+    # Must be publicly accessible HTTPS endpoint
+    callback_url: "https://yourdomain.com/mpesa/callback"
+    
+    # Use sandbox for testing (true) or production (false)
+    sandbox: true
+
+# How it works:
+# 1. Customer places order and provides delivery location
+# 2. Hive sends STK Push to customer's phone
+# 3. Customer enters M-Pesa PIN to complete payment
+# 4. M-Pesa sends confirmation to your callback URL
+# 5. Order is confirmed once payment is received
+
+# Note: You need to implement the webhook handler at callback_url
+# See docs/MPESA_INTEGRATION.md for complete setup guide

@@ -286,6 +286,103 @@ async fn handle_location_input(
     // Set location and confirm
     store.set_order_location(order_id, &location)?;
 
+    // Initiate payment if M-Pesa is configured
+    if let Some(ref payment_provider) = ctx.payment_provider {
+        
+        log::info!("💰 Initiating M-Pesa payment for order #{} — {}{:.2}", 
+                  order_id, config.business.currency, order.total);
+        
+        let payment_id = format!("PAY-{}-{}", order_id, chrono::Utc::now().timestamp());
+        
+        // Create payment record
+        store.create_payment(
+            &payment_id,
+            order_id,
+            order.total,
+            &config.business.currency,
+            "mpesa",
+            &ctx.sender,
+            &format!("Order #{}", order_id),
+        )?;
+        
+        // Initiate STK Push
+        match payment_provider.initiate_payment(
+            order.total,
+            &config.business.currency,
+            &ctx.sender,
+            &format!("Order-{}", order_id),
+        ).await {
+            Ok(checkout_request_id) => {
+                // Update payment with provider reference
+                store.update_payment_status(&payment_id, "processing", Some(&checkout_request_id))?;
+                
+                log::info!("✅ M-Pesa STK Push sent to {} — CheckoutRequestID: {}", 
+                          ctx.sender, checkout_request_id);
+                
+                // Send payment prompt to customer
+                let payment_msg = format!(
+                    "💰 *Payment Request Sent*\n\n\
+                     Check your phone for the M-Pesa payment prompt.\n\
+                     Amount: {}{:.2}\n\n\
+                     ⏱️ Please complete payment within 2 minutes.\n\n\
+                     We'll confirm your order once payment is received.",
+                    config.business.currency, order.total
+                );
+                
+                let payment_jid = ctx.chat_jid.clone();
+                let payment_wa_msg = waproto::whatsapp::Message {
+                    extended_text_message: Some(Box::new(
+                        waproto::whatsapp::message::ExtendedTextMessage {
+                            text: Some(payment_msg),
+                            ..Default::default()
+                        },
+                    )),
+                    ..Default::default()
+                };
+                
+                if let Err(e) = ctx.wa_client.send_message(payment_jid, payment_wa_msg).await {
+                    log::error!("Failed to send payment prompt: {}", e);
+                }
+                
+                // Reset state
+                *state = ConversationState::Idle;
+                
+                // Return no reply since we already sent the payment prompt
+                return Ok(HandlerResult::NoReply);
+            }
+            Err(e) => {
+                // Payment initiation failed — mark as failed and continue with cash order
+                store.update_payment_status(&payment_id, "failed", None)?;
+                log::error!("❌ M-Pesa payment failed for order #{}: {}", order_id, e);
+                
+                // Send error message and fall back to cash
+                let error_msg = format!(
+                    "⚠️ Payment request failed: {}\n\n\
+                     Your order has been placed for cash payment.\n\
+                     Order #{} — Total: {}{:.2}",
+                    e, order_id, config.business.currency, order.total
+                );
+                
+                let error_jid = ctx.chat_jid.clone();
+                let error_wa_msg = waproto::whatsapp::Message {
+                    extended_text_message: Some(Box::new(
+                        waproto::whatsapp::message::ExtendedTextMessage {
+                            text: Some(error_msg),
+                            ..Default::default()
+                        },
+                    )),
+                    ..Default::default()
+                };
+                
+                if let Err(send_err) = ctx.wa_client.send_message(error_jid, error_wa_msg).await {
+                    log::error!("Failed to send error message: {}", send_err);
+                }
+                
+                // Continue with normal order flow (fall through)
+            }
+        }
+    }
+
     // Build confirmation message for customer
     let estimate = config
         .delivery
