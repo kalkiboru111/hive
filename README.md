@@ -174,6 +174,7 @@ cargo build --release --features network
 
 ## Roadmap
 
+### Phase 1: Launch (Q1 2026) ✅
 - [x] WhatsApp integration (QR pairing)
 - [x] Menu & ordering system
 - [x] Voucher system
@@ -182,10 +183,39 @@ cargo build --release --features network
 - [x] Reality Network integration
 - [x] MessagePack state serialization
 - [x] 8 business templates
-- [ ] Payment gateway integrations
+
+**Target:** 10,000 businesses in 6 months  
+**Focus:** Africa (Kenya, Nigeria, South Africa)  
+**Profile:** Solo entrepreneurs, <100 orders/day  
+**Value:** $0/month, 5-min setup, on-chain proof
+
+### Phase 2: SME Features (Q2-Q3 2026)
+- [ ] Enhanced analytics & reporting (export CSV, daily summaries)
+- [ ] SMS fallback (Twilio integration, pay-per-use)
+- [ ] Payment gateway integrations (Stripe, PayStack)
 - [ ] M-Pesa support (Kenya)
+- [ ] Backup/failover service (Reality nodes offer for $NET)
 - [ ] Voice message support
-- [ ] Multi-bot management
+- [ ] Delivery tracking integration
+- [ ] Multi-device dashboard improvements
+
+**Target:** Extend "works well" range to 500 orders/day  
+**When:** First 100 businesses hit scale constraints
+
+### Phase 3: Business API Bridge (Q4 2026+)
+- [ ] WhatsApp Business API support (premium tier)
+- [ ] Multi-agent routing (support teams)
+- [ ] Template messages (pre-approved broadcasts)
+- [ ] Queue management (ticket assignment)
+- [ ] Shift handoff (24/7 operations)
+- [ ] Enterprise analytics
+
+**Target:** SMEs doing $10k+/month revenue  
+**When:** 10+ customers request (and can afford $49/month tier)
+
+### Scaling Considerations
+
+**See [SCALING_ANALYSIS.md](SCALING_ANALYSIS.md)** for detailed breakdown of where current model works (70-80% of SMEs) and where Business API is needed (multi-agent teams, 24/7 operations).
 
 ## Contributing
 
