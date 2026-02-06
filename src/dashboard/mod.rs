@@ -17,7 +17,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::get,
 };
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,9 @@ struct AppState {
     store: Store,
 }
 
+/// Embedded dashboard HTML (compiled into binary).
+const DASHBOARD_HTML: &str = include_str!("../../static/dashboard.html");
+
 /// Start the dashboard web server.
 pub async fn run_dashboard(config: HiveConfig, store: Store) -> Result<()> {
     let state = AppState {
@@ -39,6 +42,7 @@ pub async fn run_dashboard(config: HiveConfig, store: Store) -> Result<()> {
     };
 
     let app = Router::new()
+        .route("/", get(serve_dashboard))
         .route("/api/orders", get(list_orders))
         .route("/api/orders/{id}", get(get_order))
         .route("/api/menu", get(get_menu))
@@ -77,6 +81,10 @@ struct ApiError {
 }
 
 // ─── Handlers ────────────────────────────────────────────────────
+
+async fn serve_dashboard() -> impl IntoResponse {
+    Html(DASHBOARD_HTML)
+}
 
 async fn health_check() -> impl IntoResponse {
     Json(serde_json::json!({ "status": "ok", "service": "hive-dashboard" }))

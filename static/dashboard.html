@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+            color: #2c3e50;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 2em;
+            color: #FF8C00;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #FF8C00;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            background: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .tab.active {
+            background: #FF8C00;
+            color: white;
+            box-shadow: 0 4px 12px rgba(255,140,0,0.3);
+        }
+        
+        .tab:hover:not(.active) {
+            background: #f8f9fa;
+        }
+        
+        .panel {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .panel.active {
+            display: block;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-confirmed { background: #d1ecf1; color: #0c5460; }
+        .status-delivered { background: #d4edda; color: #155724; }
+        .status-cancelled { background: #f8d7da; color: #721c24; }
+        
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .menu-item:last-child { border-bottom: none; }
+        
+        .menu-item-name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .menu-item-emoji { font-size: 1.5em; }
+        
+        .menu-item-price {
+            font-weight: bold;
+            color: #FF8C00;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #7f8c8d;
+        }
+        
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+        
+        button {
+            background: #FF8C00;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #FF7F00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255,140,0,0.3);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+        
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+        
+        .voucher-code {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #FF8C00;
+            background: #fff3e0;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐝 Hive Dashboard</h1>
+            <p id="businessName" style="color: #7f8c8d; margin-top: 10px;">Loading...</p>
+        </header>
+        
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats populated by JS -->
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('orders')">📦 Orders</button>
+            <button class="tab" onclick="switchTab('menu')">📋 Menu</button>
+            <button class="tab" onclick="switchTab('vouchers')">🎟️ Vouchers</button>
+        </div>
+        
+        <div id="ordersPanel" class="panel active">
+            <h2 style="margin-bottom: 20px;">Recent Orders</h2>
+            <div id="ordersList"></div>
+        </div>
+        
+        <div id="menuPanel" class="panel">
+            <h2 style="margin-bottom: 20px;">Menu Items</h2>
+            <div id="menuList"></div>
+        </div>
+        
+        <div id="vouchersPanel" class="panel">
+            <h2 style="margin-bottom: 20px;">Vouchers</h2>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-bottom: 15px;">Create New Voucher</h3>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="voucherAmount" placeholder="10.00" step="0.01" min="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Code (optional - leave blank for random)</label>
+                    <input type="text" id="voucherCode" placeholder="WELCOME10">
+                </div>
+                <button onclick="createVoucher()">Create Voucher</button>
+            </div>
+            
+            <div id="vouchersList"></div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTab = 'orders';
+        let refreshInterval;
+        
+        async function fetchAPI(endpoint) {
+            const res = await fetch(`/api/${endpoint}`);
+            if (!res.ok) throw new Error(`API error: ${res.statusText}`);
+            return res.json();
+        }
+        
+        async function loadStats() {
+            try {
+                const stats = await fetchAPI('stats');
+                const grid = document.getElementById('statsGrid');
+                grid.innerHTML = `
+                    <div class="stat-card">
+                        <h3>Total Orders</h3>
+                        <div class="stat-value">${stats.total_orders || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pending</h3>
+                        <div class="stat-value" style="color: #f39c12;">${stats.pending || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Delivered</h3>
+                        <div class="stat-value" style="color: #27ae60;">${stats.delivered || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Revenue</h3>
+                        <div class="stat-value">${stats.total_revenue ? stats.total_revenue.toFixed(2) : '0.00'}</div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Failed to load stats:', e);
+            }
+        }
+        
+        async function loadOrders() {
+            try {
+                const orders = await fetchAPI('orders');
+                const list = document.getElementById('ordersList');
+                
+                if (!orders || orders.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>No orders yet</p></div>';
+                    return;
+                }
+                
+                let html = '<table><thead><tr><th>ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody>';
+                orders.forEach(order => {
+                    const statusClass = `status-${order.status.toLowerCase()}`;
+                    html += `
+                        <tr>
+                            <td>#${order.id}</td>
+                            <td>${order.customer_jid ? order.customer_jid.split('@')[0] : 'Unknown'}</td>
+                            <td>${order.item_ids ? order.item_ids.split(',').length : 0} items</td>
+                            <td>${order.total_amount ? order.total_amount.toFixed(2) : '0.00'}</td>
+                            <td><span class="status-badge ${statusClass}">${order.status}</span></td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                list.innerHTML = html;
+            } catch (e) {
+                document.getElementById('ordersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load orders</p></div>';
+                console.error('Failed to load orders:', e);
+            }
+        }
+        
+        async function loadMenu() {
+            try {
+                const menu = await fetchAPI('menu');
+                const list = document.getElementById('menuList');
+                
+                if (!menu || menu.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🍽️</div><p>No menu items</p></div>';
+                    return;
+                }
+                
+                let html = '';
+                menu.forEach(item => {
+                    html += `
+                        <div class="menu-item">
+                            <div class="menu-item-name">
+                                <span class="menu-item-emoji">${item.emoji || '📦'}</span>
+                                <div>
+                                    <div>${item.name}</div>
+                                    <div style="font-size: 0.9em; color: #7f8c8d;">${item.description || ''}</div>
+                                </div>
+                            </div>
+                            <div class="menu-item-price">${item.price.toFixed(2)}</div>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            } catch (e) {
+                document.getElementById('menuList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load menu</p></div>';
+                console.error('Failed to load menu:', e);
+            }
+        }
+        
+        async function loadVouchers() {
+            try {
+                const vouchers = await fetchAPI('vouchers');
+                const list = document.getElementById('vouchersList');
+                
+                if (!vouchers || vouchers.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎟️</div><p>No vouchers created yet</p></div>';
+                    return;
+                }
+                
+                let html = '<table><thead><tr><th>Code</th><th>Amount</th><th>Redeemed</th><th>Created</th></tr></thead><tbody>';
+                vouchers.forEach(v => {
+                    const redeemed = v.redeemed_at ? '✓ Yes' : '✗ No';
+                    html += `
+                        <tr>
+                            <td><span class="voucher-code">${v.code}</span></td>
+                            <td>${v.amount.toFixed(2)}</td>
+                            <td>${redeemed}</td>
+                            <td>${new Date(v.created_at).toLocaleDateString()}</td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                list.innerHTML = html;
+            } catch (e) {
+                document.getElementById('vouchersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load vouchers</p></div>';
+                console.error('Failed to load vouchers:', e);
+            }
+        }
+        
+        async function createVoucher() {
+            const amount = parseFloat(document.getElementById('voucherAmount').value);
+            const code = document.getElementById('voucherCode').value.trim();
+            
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/vouchers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, code: code || null })
+                });
+                
+                if (!res.ok) throw new Error('Failed to create voucher');
+                
+                const result = await res.json();
+                alert(`Voucher created! Code: ${result.code}`);
+                
+                document.getElementById('voucherAmount').value = '';
+                document.getElementById('voucherCode').value = '';
+                
+                loadVouchers();
+                loadStats();
+            } catch (e) {
+                alert('Failed to create voucher: ' + e.message);
+            }
+        }
+        
+        function switchTab(tab) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update panels
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(tab + 'Panel').classList.add('active');
+            
+            currentTab = tab;
+            loadTabData(tab);
+        }
+        
+        function loadTabData(tab) {
+            if (tab === 'orders') loadOrders();
+            else if (tab === 'menu') loadMenu();
+            else if (tab === 'vouchers') loadVouchers();
+        }
+        
+        // Initial load
+        async function init() {
+            await loadStats();
+            loadOrders();
+            
+            // Set business name in header (from first API call)
+            try {
+                const health = await fetchAPI('health');
+                // We don't have business name in health endpoint, could add it
+            } catch (e) {}
+            
+            // Auto-refresh every 10 seconds
+            refreshInterval = setInterval(() => {
+                loadStats();
+                loadTabData(currentTab);
+            }, 10000);
+        }
+        
+        init();
+    </script>
+</body>
+</html>
