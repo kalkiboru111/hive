@@ -79,6 +79,56 @@ pub struct VoucherRecord {
     pub redeemed_at: Option<String>,
 }
 
+/// Refund record for audit trail.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RefundRecord {
+    pub id: String,
+    pub payment_id: String,
+    pub order_id: i64,
+    pub amount: f64,
+    pub currency: String,
+    pub phone: String,
+    pub reason: Option<String>,
+    pub conversation_id: Option<String>,
+    pub status: RefundStatus,
+    pub admin_id: Option<String>,
+    pub created_at: String,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum RefundStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl RefundStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            RefundStatus::Pending => "pending",
+            RefundStatus::Processing => "processing",
+            RefundStatus::Completed => "completed",
+            RefundStatus::Failed => "failed",
+            RefundStatus::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "pending" => Self::Pending,
+            "processing" => Self::Processing,
+            "completed" => Self::Completed,
+            "failed" => Self::Failed,
+            "cancelled" => Self::Cancelled,
+            _ => Self::Pending,
+        }
+    }
+}
+
 /// Stats summary for the dashboard.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stats {
@@ -150,11 +200,30 @@ impl Store {
                 FOREIGN KEY (order_id) REFERENCES orders(id)
             );
 
+            CREATE TABLE IF NOT EXISTS refunds (
+                id                  TEXT PRIMARY KEY,
+                payment_id          TEXT NOT NULL,
+                order_id            INTEGER NOT NULL,
+                amount              REAL NOT NULL,
+                currency            TEXT NOT NULL DEFAULT 'KES',
+                phone               TEXT NOT NULL,
+                reason              TEXT,
+                conversation_id     TEXT,
+                status              TEXT NOT NULL DEFAULT 'pending',
+                admin_id            TEXT,
+                created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at        TEXT,
+                FOREIGN KEY (payment_id) REFERENCES payments(id),
+                FOREIGN KEY (order_id) REFERENCES orders(id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
             CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
             CREATE INDEX IF NOT EXISTS idx_vouchers_code ON vouchers(code);
             CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
             CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+            CREATE INDEX IF NOT EXISTS idx_refunds_payment ON refunds(payment_id);
+            CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);
             ",
         )?;
 
@@ -644,6 +713,168 @@ impl Store {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    // ─── Refunds ─────────────────────────────────────────────────────
+
+    /// Create a new refund record.
+    pub fn create_refund(
+        &self,
+        refund_id: &str,
+        payment_id: &str,
+        order_id: i64,
+        amount: f64,
+        currency: &str,
+        phone: &str,
+        reason: Option<&str>,
+        admin_id: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO refunds (id, payment_id, order_id, amount, currency, phone, reason, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![refund_id, payment_id, order_id, amount, currency, phone, reason, admin_id],
+        )?;
+        Ok(())
+    }
+
+    /// Update refund status and conversation ID.
+    pub fn update_refund_status(
+        &self,
+        refund_id: &str,
+        status: &str,
+        conversation_id: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let _completed_at = if status == "completed" { Some("datetime('now')") } else { None };
+        
+        if let Some(conv_id) = conversation_id {
+            conn.execute(
+                "UPDATE refunds SET status = ?1, conversation_id = ?2, completed_at = COALESCE(completed_at, datetime('now')) WHERE id = ?3",
+                params![status, conv_id, refund_id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE refunds SET status = ?1, completed_at = COALESCE(completed_at, datetime('now')) WHERE id = ?2",
+                params![status, refund_id],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Get refund by ID.
+    pub fn get_refund(&self, refund_id: &str) -> Result<Option<RefundRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, payment_id, order_id, amount, currency, phone, reason, conversation_id, status, admin_id, created_at, completed_at
+             FROM refunds WHERE id = ?1",
+        )?;
+
+        let result = stmt.query_row(params![refund_id], |row| {
+            Ok(RefundRecord {
+                id: row.get(0)?,
+                payment_id: row.get(1)?,
+                order_id: row.get(2)?,
+                amount: row.get(3)?,
+                currency: row.get(4)?,
+                phone: row.get(5)?,
+                reason: row.get(6)?,
+                conversation_id: row.get(7)?,
+                status: RefundStatus::from_str(&row.get::<_, String>(8)?),
+                admin_id: row.get(9)?,
+                created_at: row.get(10)?,
+                completed_at: row.get(11)?,
+            })
+        });
+
+        match result {
+            Ok(refund) => Ok(Some(refund)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// List refunds with optional status filter.
+    pub fn list_refunds(&self, status: Option<&RefundStatus>) -> Result<Vec<RefundRecord>> {
+        let conn = self.conn.lock().unwrap();
+        
+        let refunds = if let Some(s) = status {
+            let mut stmt = conn.prepare(
+                "SELECT id, payment_id, order_id, amount, currency, phone, reason, conversation_id, status, admin_id, created_at, completed_at
+                 FROM refunds WHERE status = ?1 ORDER BY created_at DESC",
+            )?;
+            stmt.query_map(params![s.as_str()], |row| {
+                Ok(RefundRecord {
+                    id: row.get(0)?,
+                    payment_id: row.get(1)?,
+                    order_id: row.get(2)?,
+                    amount: row.get(3)?,
+                    currency: row.get(4)?,
+                    phone: row.get(5)?,
+                    reason: row.get(6)?,
+                    conversation_id: row.get(7)?,
+                    status: RefundStatus::from_str(&row.get::<_, String>(8)?),
+                    admin_id: row.get(9)?,
+                    created_at: row.get(10)?,
+                    completed_at: row.get(11)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, payment_id, order_id, amount, currency, phone, reason, conversation_id, status, admin_id, created_at, completed_at
+                 FROM refunds ORDER BY created_at DESC",
+            )?;
+            stmt.query_map(params![], |row| {
+                Ok(RefundRecord {
+                    id: row.get(0)?,
+                    payment_id: row.get(1)?,
+                    order_id: row.get(2)?,
+                    amount: row.get(3)?,
+                    currency: row.get(4)?,
+                    phone: row.get(5)?,
+                    reason: row.get(6)?,
+                    conversation_id: row.get(7)?,
+                    status: RefundStatus::from_str(&row.get::<_, String>(8)?),
+                    admin_id: row.get(9)?,
+                    created_at: row.get(10)?,
+                    completed_at: row.get(11)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        };
+
+        Ok(refunds)
+    }
+
+    /// Get refunds for a payment.
+    pub fn get_payment_refunds(&self, payment_id: &str) -> Result<Vec<RefundRecord>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, payment_id, order_id, amount, currency, phone, reason, conversation_id, status, admin_id, created_at, completed_at
+             FROM refunds WHERE payment_id = ?1 ORDER BY created_at DESC",
+        )?;
+
+        let refunds = stmt
+            .query_map(params![payment_id], |row| {
+                Ok(RefundRecord {
+                    id: row.get(0)?,
+                    payment_id: row.get(1)?,
+                    order_id: row.get(2)?,
+                    amount: row.get(3)?,
+                    currency: row.get(4)?,
+                    phone: row.get(5)?,
+                    reason: row.get(6)?,
+                    conversation_id: row.get(7)?,
+                    status: RefundStatus::from_str(&row.get::<_, String>(8)?),
+                    admin_id: row.get(9)?,
+                    created_at: row.get(10)?,
+                    completed_at: row.get(11)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(refunds)
     }
 }
 
