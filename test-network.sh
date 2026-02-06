@@ -3,7 +3,7 @@
 
 set -e
 
-L0_URL="${L0_URL:-http://localhost:9100}"
+L0_URL="${L0_URL:-http://localhost:7100}"  # Local test cluster (port 7100 to avoid Sentiment at 9100)
 
 echo "🐝 Testing Hive → Reality Network Integration"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

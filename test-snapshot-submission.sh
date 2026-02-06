@@ -8,7 +8,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 BOT_DIR="/tmp/hive-cluster-test"
-L0_URL="http://localhost:9100"
+L0_URL="http://localhost:7100"  # Local test cluster (port 7100 to avoid Sentiment at 9100)
 
 echo "Step 1: Check bot configuration"
 if [ ! -f "$BOT_DIR/config.yaml" ]; then

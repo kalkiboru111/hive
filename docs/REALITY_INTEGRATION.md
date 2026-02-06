@@ -122,9 +122,11 @@ network:
 ```
 
 **Common endpoints:**
-- **Local cluster:** `http://localhost:9100`
-- **Testnet:** `http://100.123.52.97:9100`
+- **Local cluster:** `http://localhost:7100` (port 7100 to avoid conflict with live nodes)
+- **Live Sentiment testnet:** `http://localhost:9100` (Mac Mini Tailscale, DO NOT USE for testing)
 - **Mainnet:** (TBD)
+
+⚠️ **CRITICAL:** The Mac Mini runs Sentiment at `100.123.52.97:9100` (Tailscale). This resolves to `localhost:9100` locally. Always use port `7100` for local testing to avoid interfering with live rApps.
 
 ---
 
