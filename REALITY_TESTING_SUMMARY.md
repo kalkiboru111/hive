@@ -1,7 +1,36 @@
 # Reality Network Integration Testing — Summary
 
 **Date:** February 6, 2026  
-**Status:** ✅ Integration functional, ready for production testing
+**Status:** ⚠️ Integration functional, isolated from live Sentiment network after critical safety fix
+
+---
+
+## ⚠️ CRITICAL ISSUE DISCOVERED & RESOLVED
+
+**Problem:** Tailscale IP `100.123.52.97` (Mac Mini) resolves to `localhost:9100` where **live Sentiment testnet is running**.
+
+**What happened:**
+1. Started local Reality cluster on port 9100
+2. Docker containers stopped mid-testing
+3. Test scripts queried `localhost:9100` and `100.123.52.97:9100`
+4. Both resolved to the **LIVE Sentiment network** (ordinal 6064)
+5. Risk of interfering with production rApp
+
+**Verification:**
+- Test bot identity: `NET1hrf37iZr564XaGj3WYmVA6ko2ipNiPE5s8U6`
+- Query to live network: No snapshots found (safe)
+- Database: 0 orders (never ran)
+- **Result: No interference occurred** ✅
+
+**Fix applied:**
+- Changed local test cluster port: **9100 → 7100**
+- Updated all scripts/docs to use port 7100
+- Added critical warning in REALITY_INTEGRATION.md
+- Test bot config now points to `localhost:7100`
+
+**Port mapping:**
+- `7100` = Local test cluster (safe for testing)
+- `9100` = Live Sentiment network (DO NOT TEST)
 
 ---
 
