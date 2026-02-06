@@ -133,7 +133,7 @@ Traditional banks require proof of income. With Hive on Reality Network:
 
 ### Real-World Example
 
-**Mama Njeri's Kitchen:**
+**Cloudy Deliveries:**
 - 6 months of trading history
 - KES 450,000 total revenue
 - 96.8% payment success rate

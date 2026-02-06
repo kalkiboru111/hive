@@ -500,7 +500,7 @@ GET /api/export/ledger
 {
   "generated_at": "2026-02-06T12:00:00Z",
   "business": {
-    "name": "Mama Njeri's Kitchen",
+    "name": "Cloudy Deliveries",
     "currency": "KES",
     "phone": "+254722000000"
   },
@@ -564,7 +564,7 @@ jq '.' ledger.json > ledger-readable.json
 
 ### Real-World Example
 
-**Scenario:** Mama Njeri needs KES 500,000 loan to buy a commercial oven.
+**Scenario:** Cloudy needs KES 500,000 loan to buy a commercial oven.
 
 **Her ledger shows:**
 - 6 months of trading history
