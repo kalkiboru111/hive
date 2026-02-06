@@ -168,7 +168,7 @@ fn cmd_wizard(path: &PathBuf) -> Result<()> {
     println!("🐝 Hive Setup Wizard\n");
     println!("Let's build your WhatsApp bot! Answer a few questions:\n");
 
-    // Step 1: Business type
+    // Step 1: Business type (with validation)
     println!("1. What type of business are you building?\n");
     println!("   1. Food delivery");
     println!("   2. Salon / Beauty booking");
@@ -179,49 +179,97 @@ fn cmd_wizard(path: &PathBuf) -> Result<()> {
     println!("   7. Customer support");
     println!("   8. Real estate");
     println!("   9. Custom (blank template)");
-    print!("\nYour choice (1-9): ");
-    io::stdout().flush()?;
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let template_choice = input.trim();
+    let template = loop {
+        print!("\nYour choice (1-9): ");
+        io::stdout().flush()?;
 
-    let template = match template_choice {
-        "1" => "food-delivery",
-        "2" => "salon-booking",
-        "3" => "event-tickets",
-        "4" => "tutoring",
-        "5" => "voucher-store",
-        "6" => "community-store",
-        "7" => "customer-support",
-        "8" => "real-estate",
-        "9" => "default",
-        _ => {
-            println!("Invalid choice. Using blank template.");
-            "default"
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let choice = input.trim();
+
+        match choice {
+            "1" => break "food-delivery",
+            "2" => break "salon-booking",
+            "3" => break "event-tickets",
+            "4" => break "tutoring",
+            "5" => break "voucher-store",
+            "6" => break "community-store",
+            "7" => break "customer-support",
+            "8" => break "real-estate",
+            "9" => break "default",
+            _ => println!("❌ Invalid choice '{}'. Please enter a number between 1 and 9.", choice),
         }
     };
 
-    // Step 2: Business name
-    print!("\n2. What's your business name? ");
-    io::stdout().flush()?;
-    let mut business_name = String::new();
-    io::stdin().read_line(&mut business_name)?;
-    let business_name = business_name.trim();
+    // Step 2: Business name (with validation)
+    let business_name = loop {
+        print!("\n2. What's your business name? ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let name = input.trim();
 
-    // Step 3: Currency
-    print!("\n3. What currency do you use? (USD, EUR, KES, ZAR, etc.) ");
-    io::stdout().flush()?;
-    let mut currency = String::new();
-    io::stdin().read_line(&mut currency)?;
-    let currency = currency.trim().to_uppercase();
+        if name.is_empty() {
+            println!("❌ Business name cannot be empty.");
+            continue;
+        }
+        if name.len() > 50 {
+            println!("❌ Business name too long (max 50 characters).");
+            continue;
+        }
+        break name.to_string();
+    };
 
-    // Step 4: Admin number
-    print!("\n4. Your WhatsApp number (with country code, e.g. +254712345678): ");
-    io::stdout().flush()?;
-    let mut admin_number = String::new();
-    io::stdin().read_line(&mut admin_number)?;
-    let admin_number = admin_number.trim();
+    // Step 3: Currency (with validation)
+    let currency = loop {
+        print!("\n3. What currency do you use? (USD, EUR, KES, ZAR, etc.) ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let curr = input.trim().to_uppercase();
+
+        if curr.is_empty() {
+            println!("❌ Currency cannot be empty.");
+            continue;
+        }
+        if curr.len() != 3 {
+            println!("❌ Currency code must be exactly 3 letters (e.g., USD, EUR, KES).");
+            continue;
+        }
+        if !curr.chars().all(|c| c.is_ascii_alphabetic()) {
+            println!("❌ Currency code must contain only letters.");
+            continue;
+        }
+        break curr;
+    };
+
+    // Step 4: Admin number (with validation)
+    let admin_number = loop {
+        print!("\n4. Your WhatsApp number (with country code, e.g. +254712345678): ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let number = input.trim();
+
+        if number.is_empty() {
+            println!("❌ Phone number cannot be empty.");
+            continue;
+        }
+        if !number.starts_with('+') {
+            println!("❌ Phone number must start with + (country code).");
+            continue;
+        }
+        if number.len() < 8 || number.len() > 20 {
+            println!("❌ Phone number length invalid (expected 8-20 characters including +).");
+            continue;
+        }
+        if !number[1..].chars().all(|c| c.is_ascii_digit()) {
+            println!("❌ Phone number must contain only digits after the +.");
+            continue;
+        }
+        break number.to_string();
+    };
 
     // Create project directory
     std::fs::create_dir_all(path)?;
@@ -236,15 +284,15 @@ fn cmd_wizard(path: &PathBuf) -> Result<()> {
     };
 
     // Replace placeholders
-    config_content = config_content.replace("My Business", business_name);
-    config_content = config_content.replace("My Kitchen", business_name);
-    config_content = config_content.replace("My Salon", business_name);
-    config_content = config_content.replace("My Events", business_name);
-    config_content = config_content.replace("My Tutoring", business_name);
-    config_content = config_content.replace("My Vouchers", business_name);
-    config_content = config_content.replace("Community Market", business_name);
-    config_content = config_content.replace("Support Bot", business_name);
-    config_content = config_content.replace("Property Listings", business_name);
+    config_content = config_content.replace("My Business", &business_name);
+    config_content = config_content.replace("My Kitchen", &business_name);
+    config_content = config_content.replace("My Salon", &business_name);
+    config_content = config_content.replace("My Events", &business_name);
+    config_content = config_content.replace("My Tutoring", &business_name);
+    config_content = config_content.replace("My Vouchers", &business_name);
+    config_content = config_content.replace("Community Market", &business_name);
+    config_content = config_content.replace("Support Bot", &business_name);
+    config_content = config_content.replace("Property Listings", &business_name);
     config_content = config_content.replace("\"USD\"", &format!("\"{}\"", currency));
     config_content = config_content.replace("\"+1234567890\"", &format!("\"{}\"", admin_number));
 
