@@ -1,0 +1,64 @@
+# Swahili Food Delivery Template — Chakula
+# Mfano wa bot ya utoaji chakula kwa Kiswahili
+
+business:
+  name: "Chakula cha Mama"
+  currency: "KES"
+  welcome: |
+    Karibu Chakula cha Mama! 🍛
+
+    Jibu na namba:
+    1. 📋 Angalia Menyu
+    2. 📦 Maagizo Yangu
+    3. 🎟️ Tumia Vocha
+    4. ℹ️ Kuhusu Sisi
+  about: "Chakula cha nyumbani, kitamu na cha afya. Tunafikisha mpaka mlangoni mwako! ❤️"
+
+menu:
+  - name: "Ugali na Sukuma"
+    price: 150
+    emoji: "🥬"
+    description: "Ugali na mboga za majani zilizokangwa"
+  - name: "Pilau"
+    price: 200
+    emoji: "🍚"
+    description: "Wali wa pilau na nyama ya ng'ombe"
+  - name: "Chapati"
+    price: 50
+    emoji: "🫓"
+    description: "Chapati laini (vipande 5)"
+  - name: "Nyama Choma"
+    price: 350
+    emoji: "🍖"
+    description: "Nyama ya mbuzi iliyochomwa"
+  - name: "Mandazi"
+    price: 30
+    emoji: "🍩"
+    description: "Mandazi tamu (vipande 4)"
+  - name: "Chai"
+    price: 40
+    emoji: "☕"
+    description: "Chai ya maziwa moto"
+
+delivery:
+  fee: 50
+  estimate_minutes: [30, 45]
+
+admin_numbers:
+  - "+254712345678"  # BADILISHA na namba yako ya WhatsApp
+
+messages:
+  order_confirmed: "✅ Agizo #{id} limethibitishwa!\n📍 Tafadhali tuma anwani yako\n⏱ Muda wa kufikisha: {estimate}"
+  order_received_admin: "🔔 Agizo Jipya #{id}\n\n{items}\n\nJumla: {currency}{total}\n📍 {location}\n\nJibu IMEFIKISHWA {id} ukisha fikisha"
+  order_delivered: "🎉 Agizo #{id} limefikishwa! Furahia chakula! 😊\n\nTupatieni alama: ⭐⭐⭐⭐⭐"
+  voucher_created: "🎟️ Vocha {code} — punguzo la {currency}{amount}"
+  voucher_redeemed: "✅ Vocha {code} imetumika! Punguzo la {currency}{amount}."
+  voucher_invalid: "❌ Vocha si sahihi."
+
+dashboard:
+  port: 8080
+  enabled: true
+
+network:
+  enabled: true
+  l0_url: "http://100.123.52.97:9100"

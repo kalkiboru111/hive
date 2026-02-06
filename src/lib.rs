@@ -6,6 +6,7 @@ pub mod bot;
 pub mod config;
 pub mod dashboard;
 pub mod handlers;
+pub mod i18n;
 pub mod network;
 pub mod store;
 pub mod vouchers;
