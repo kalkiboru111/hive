@@ -7,9 +7,11 @@
 
 pub mod mpesa;
 pub mod types;
+pub mod webhook;
 
 pub use mpesa::MpesaClient;
 pub use types::{Payment, PaymentMethod, PaymentStatus};
+pub use webhook::{MpesaCallback, PaymentDetails, process_callback};
 
 use anyhow::Result;
 

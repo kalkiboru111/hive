@@ -575,6 +575,44 @@ impl Store {
 
         Ok(payments)
     }
+
+    /// Get payment by provider reference (e.g., M-Pesa CheckoutRequestID).
+    pub fn get_payment_by_provider_ref(&self, provider_ref: &str) -> Result<Option<Payment>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, order_id, amount, currency, method, status, phone, reference, provider_ref, created_at, updated_at
+             FROM payments WHERE provider_ref = ?1",
+        )?;
+
+        let result = stmt.query_row(params![provider_ref], |row| {
+                Ok(Payment {
+                    id: row.get(0)?,
+                    order_id: row.get(1)?,
+                    amount: row.get(2)?,
+                    currency: row.get(3)?,
+                    method: serde_json::from_str(&format!(r#""{}""#, row.get::<_, String>(4)?)).unwrap(),
+                    status: match row.get::<_, String>(5)?.as_str() {
+                        "pending" => PaymentStatus::Pending,
+                        "processing" => PaymentStatus::Processing,
+                        "completed" => PaymentStatus::Completed,
+                        "failed" => PaymentStatus::Failed,
+                        "cancelled" => PaymentStatus::Cancelled,
+                        _ => PaymentStatus::Pending,
+                    },
+                    phone: row.get(6)?,
+                    reference: row.get(7)?,
+                    provider_ref: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            });
+
+        match result {
+            Ok(payment) => Ok(Some(payment)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
 }
 
 #[cfg(test)]

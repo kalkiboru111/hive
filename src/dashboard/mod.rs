@@ -11,6 +11,7 @@
 //! - GET  /api/stats        — aggregate statistics
 
 use crate::config::HiveConfig;
+use crate::payments::{MpesaCallback, process_callback};
 use crate::store::{OrderStatus, Store};
 use anyhow::Result;
 use axum::{
@@ -18,7 +19,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse},
-    routing::get,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -49,6 +50,7 @@ pub async fn run_dashboard(config: HiveConfig, store: Store) -> Result<()> {
         .route("/api/vouchers", get(list_vouchers).post(create_voucher))
         .route("/api/stats", get(get_stats))
         .route("/api/health", get(health_check))
+        .route("/api/mpesa/callback", post(mpesa_callback))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -195,5 +197,30 @@ async fn get_stats(State(state): State<AppState>) -> impl IntoResponse {
             }),
         )
             .into_response(),
+    }
+}
+
+/// M-Pesa webhook handler for payment callbacks
+async fn mpesa_callback(
+    State(state): State<AppState>,
+    Json(callback): Json<MpesaCallback>,
+) -> impl IntoResponse {
+    log::info!("📥 M-Pesa callback received");
+    
+    match process_callback(callback, &state.store).await {
+        Ok(message) => {
+            log::info!("✅ {}", message);
+            (StatusCode::OK, Json(serde_json::json!({
+                "ResultCode": 0,
+                "ResultDesc": "Accepted"
+            }))).into_response()
+        }
+        Err(e) => {
+            log::error!("❌ M-Pesa callback processing failed: {}", e);
+            (StatusCode::OK, Json(serde_json::json!({
+                "ResultCode": 1,
+                "ResultDesc": format!("Error: {}", e)
+            }))).into_response()
+        }
     }
 }
