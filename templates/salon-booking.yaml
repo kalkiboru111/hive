@@ -1,0 +1,64 @@
+# Salon & Beauty Booking Template
+# Perfect for: hair salons, barbers, nail studios, spas
+
+business:
+  name: "My Salon"
+  currency: "USD"
+  welcome: |
+    Welcome to My Salon! 💇‍♀️✨
+
+    Reply with a number:
+    1. 📋 View Services
+    2. 📅 My Bookings
+    3. 🎟️ Redeem Voucher
+    4. ℹ️ About Us
+  about: "Professional beauty services. Book your appointment via WhatsApp. Walk-ins welcome!"
+
+menu:
+  - name: "Women's Haircut"
+    price: 45.00
+    emoji: "💇‍♀️"
+    description: "Wash, cut, and blow-dry (60 min)"
+  - name: "Men's Haircut"
+    price: 25.00
+    emoji: "💇‍♂️"
+    description: "Cut and style (30 min)"
+  - name: "Hair Color"
+    price: 80.00
+    emoji: "🎨"
+    description: "Full color treatment (90 min)"
+  - name: "Manicure"
+    price: 30.00
+    emoji: "💅"
+    description: "Classic manicure with polish (45 min)"
+  - name: "Pedicure"
+    price: 40.00
+    emoji: "🦶"
+    description: "Relaxing pedicure with polish (60 min)"
+  - name: "Facial Treatment"
+    price: 60.00
+    emoji: "✨"
+    description: "Deep cleanse and hydration (75 min)"
+  - name: "Eyebrow Threading"
+    price: 15.00
+    emoji: "👁️"
+    description: "Shape and clean (15 min)"
+
+admin_numbers:
+  - "+1234567890"  # REPLACE with your WhatsApp number
+
+messages:
+  order_confirmed: "✅ Booking #{id} confirmed!\n📅 Please send your preferred date & time\n⏱ Duration: {estimate}\n\nWe'll confirm availability within 1 hour."
+  order_received_admin: "🔔 New Booking #{id}\n\n{items}\n\nTotal: {currency}{total}\n📅 Requested: {location}\n\nReply CONFIRM {id} to approve"
+  order_delivered: "✨ See you soon for booking #{id}! If you need to reschedule, just message us."
+  voucher_created: "🎟️ Gift voucher {code} — {currency}{amount}"
+  voucher_redeemed: "✅ Voucher {code} redeemed! {currency}{amount} off your booking."
+  voucher_invalid: "❌ Invalid voucher code."
+
+dashboard:
+  port: 8080
+  enabled: true
+
+network:
+  enabled: true
+  l0_url: "http://100.123.52.97:9100"

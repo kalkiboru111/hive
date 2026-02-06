@@ -1,0 +1,56 @@
+# Customer Support Bot Template
+# Perfect for: small businesses, SaaS products, service companies
+
+business:
+  name: "Support Bot"
+  currency: "USD"
+  welcome: |
+    👋 Welcome to Support!
+
+    Reply with a number:
+    1. ❓ Get Help
+    2. 📋 Submit Ticket
+    3. 📦 Track Request
+    4. ℹ️ About Us
+  about: "24/7 automated support. Real humans respond within 4 hours."
+
+menu:
+  - name: "Technical Issue"
+    price: 0.00
+    emoji: "🔧"
+    description: "Bug reports, errors, technical problems"
+  - name: "Billing Question"
+    price: 0.00
+    emoji: "💳"
+    description: "Invoices, payments, subscription issues"
+  - name: "Feature Request"
+    price: 0.00
+    emoji: "💡"
+    description: "Suggest new features or improvements"
+  - name: "Account Help"
+    price: 0.00
+    emoji: "👤"
+    description: "Login issues, password resets, account changes"
+  - name: "General Inquiry"
+    price: 0.00
+    emoji: "📧"
+    description: "Everything else"
+
+admin_numbers:
+  - "+1234567890"  # REPLACE with your support team number
+
+messages:
+  order_confirmed: "✅ Ticket #{id} created!\n\n📝 Please describe your issue in detail.\n\n⏱ We'll respond within 4 hours."
+  order_received_admin: "🆘 New Support Ticket #{id}\n\nType: {items}\nFrom: {location}\n\nReply CLOSE {id} when resolved"
+  order_delivered: "✅ Ticket #{id} has been resolved. Need more help? Just message us again!"
+  voucher_created: "🎟️ Priority support code {code}"
+  voucher_redeemed: "✅ Priority code {code} applied — you're at the front of the queue!"
+  voucher_invalid: "❌ Invalid support code."
+
+dashboard:
+  port: 8080
+  enabled: true
+
+network:
+  enabled: true
+  l0_url: "http://100.123.52.97:9100"

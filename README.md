@@ -8,37 +8,67 @@ Hive is a framework that lets anyone create a WhatsApp-based business — orderi
 
 ## Quick Start
 
+### For Builders (Non-Technical)
+
+**👉 [Start here: FOR_BUILDERS.md](FOR_BUILDERS.md)**
+
+Use the interactive wizard:
+
 ```bash
-# Download the binary (or build from source)
+./hive wizard my-business
+# Answer 4 questions, your config is ready
+./hive run my-business/
+# Scan QR, bot is live
+```
+
+### For Developers
+
+```bash
+# Use a template
+./hive init --template food-delivery my-bot
+
+# Or start from scratch
 ./hive init my-bot
 
 # Edit your config
 nano my-bot/config.yaml
 
-# Run it — scan the QR code with WhatsApp
+# Run it
 ./hive run my-bot/
 ```
 
-That's it. Your bot is live.
+**See all templates:**
 
-## Example: Cloudy Deliveries
-
-A food delivery bot for townships. See `examples/cloudy-deliveries/` for the full template.
-
-```yaml
-business:
-  name: "Cloudy Deliveries"
-  currency: "ZAR"
-  welcome: "Welcome to Cloudy Deliveries! 🍔☁️"
-
-menu:
-  - name: "Kota"
-    price: 35.00
-    emoji: "🌯"
-  - name: "Bunny Chow"
-    price: 45.00
-    emoji: "🍛"
+```bash
+./hive templates
 ```
+
+## Templates
+
+Hive includes **8 pre-built templates** for common businesses:
+
+- **food-delivery** — Restaurants, street food, home kitchens
+- **salon-booking** — Hair salons, barbers, spas
+- **event-tickets** — Concerts, workshops, classes
+- **tutoring** — Private lessons, test prep
+- **voucher-store** — Gift cards, loyalty programs
+- **community-store** — Co-ops, farmer's markets
+- **customer-support** — Help desk, ticket system
+- **real-estate** — Property listings, viewings
+
+**See all templates:**
+
+```bash
+./hive templates
+```
+
+**Use a template:**
+
+```bash
+./hive init --template food-delivery my-restaurant
+```
+
+Each template includes pre-filled menu items, messages, and settings — just customize and go.
 
 ## Features
 
@@ -62,9 +92,13 @@ Your Device (laptop/phone)
 └── Reality Network Node (rApp integration)
 ```
 
-## Config Reference
+## Documentation
 
-See [docs/config.md](docs/config.md) for the full configuration reference.
+- **[For Builders (Non-Technical)](FOR_BUILDERS.md)** — Start here if you're new
+- **[Builder's Guide](docs/BUILDERS_GUIDE.md)** — Full walkthrough with examples, tips, FAQ
+- **[Video Tutorial](docs/VIDEO_SCRIPT.md)** — 5-minute screencast (production script)
+- **[Quickstart](docs/QUICKSTART.md)** — Minimal setup guide
+- **[Config Reference](docs/config.md)** — Full configuration options *(coming soon)*
 
 ## Building from Source
 

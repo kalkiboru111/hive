@@ -1,0 +1,55 @@
+# Real Estate Listings Template
+# Perfect for: property agents, rental managers, vacation homes
+
+business:
+  name: "Property Listings"
+  currency: "USD"
+  welcome: |
+    Welcome! 🏡
+
+    Reply with a number:
+    1. 🏠 View Properties
+    2. 📅 Schedule Viewing
+    3. ℹ️ About Us
+  about: "Find your next home via WhatsApp. Browse listings, book viewings, ask questions."
+
+menu:
+  - name: "2BR Apartment - Downtown"
+    price: 1500.00
+    emoji: "🏢"
+    description: "$1500/mo • 2 bed, 1 bath • Modern kitchen • Near metro"
+  - name: "3BR House - Suburbs"
+    price: 2200.00
+    emoji: "🏡"
+    description: "$2200/mo • 3 bed, 2 bath • Yard • Garage • Family-friendly"
+  - name: "Studio Loft - Arts District"
+    price: 1100.00
+    emoji: "🎨"
+    description: "$1100/mo • Open floor plan • High ceilings • Pet-friendly"
+  - name: "4BR Villa - Beachside"
+    price: 3500.00
+    emoji: "🏖️"
+    description: "$3500/mo • 4 bed, 3 bath • Ocean view • Pool • Short-term OK"
+  - name: "1BR Condo - City Center"
+    price: 1300.00
+    emoji: "🌆"
+    description: "$1300/mo • 1 bed, 1 bath • Gym • Rooftop • Walk to everything"
+
+admin_numbers:
+  - "+1234567890"  # REPLACE with your agent number
+
+messages:
+  order_confirmed: "✅ Viewing request #{id} received!\n\n📍 Property: {items}\n📅 Please send your preferred date & time\n\nI'll confirm availability within 2 hours."
+  order_received_admin: "🔔 Viewing Request #{id}\n\nProperty: {items}\nClient: {location}\nPreferred time: TBD\n\nReply CONFIRM {id} <date> to schedule"
+  order_delivered: "📅 Your viewing for #{id} is confirmed! See you there! Bring ID and proof of income if interested."
+  voucher_created: "🎟️ Referral code {code} — {currency}{amount} off first month"
+  voucher_redeemed: "✅ Referral {code} applied! {currency}{amount} off your first month's rent."
+  voucher_invalid: "❌ Invalid referral code."
+
+dashboard:
+  port: 8080
+  enabled: true
+
+network:
+  enabled: true
+  l0_url: "http://100.123.52.97:9100"

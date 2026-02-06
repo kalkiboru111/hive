@@ -36,7 +36,17 @@ enum Commands {
     Init {
         /// Directory to create the project in
         path: PathBuf,
+        /// Use a template (food-delivery, salon-booking, etc.)
+        #[arg(long)]
+        template: Option<String>,
     },
+    /// Interactive setup wizard for new bots
+    Wizard {
+        /// Directory to create the project in
+        path: PathBuf,
+    },
+    /// List available templates
+    Templates,
     /// Start the bot (and dashboard if enabled)
     Run {
         /// Path to the bot project directory (containing config.yaml)
@@ -62,7 +72,9 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init { path } => cmd_init(&path)?,
+        Commands::Init { path, template } => cmd_init(&path, template.as_deref())?,
+        Commands::Wizard { path } => cmd_wizard(&path)?,
+        Commands::Templates => cmd_templates()?,
         Commands::Run { path, phone } => cmd_run(&path, phone).await?,
         Commands::Dashboard { path } => cmd_dashboard(&path).await?,
     }
@@ -71,7 +83,7 @@ async fn main() -> Result<()> {
 }
 
 /// `hive init <path>` — create project scaffold
-fn cmd_init(path: &PathBuf) -> Result<()> {
+fn cmd_init(path: &PathBuf, template: Option<&str>) -> Result<()> {
     if path.exists() {
         anyhow::bail!("Directory {} already exists", path.display());
     }
@@ -79,8 +91,15 @@ fn cmd_init(path: &PathBuf) -> Result<()> {
     std::fs::create_dir_all(path)
         .with_context(|| format!("Failed to create directory {}", path.display()))?;
 
+    // Choose template content
+    let config_content = if let Some(template_name) = template {
+        load_template(template_name)?
+    } else {
+        DEFAULT_CONFIG.to_string()
+    };
+
     let config_path = path.join("config.yaml");
-    std::fs::write(&config_path, DEFAULT_CONFIG)
+    std::fs::write(&config_path, config_content)
         .with_context(|| format!("Failed to write {}", config_path.display()))?;
 
     // Create data directory for SQLite
@@ -92,10 +111,152 @@ fn cmd_init(path: &PathBuf) -> Result<()> {
     info!("   Then run: hive run {}/", path.display());
 
     println!("\n🐝 Hive bot project created at {}", path.display());
+    if let Some(t) = template {
+        println!("   Template: {}", t);
+    }
     println!("\nNext steps:");
     println!("  1. Edit {}/config.yaml", path.display());
     println!("  2. Run: hive run {}/", path.display());
     println!("  3. Scan the QR code with WhatsApp");
+
+    Ok(())
+}
+
+/// Load template by name (embedded at compile time)
+fn load_template(name: &str) -> Result<String> {
+    let content = match name {
+        "food-delivery" => include_str!("../templates/food-delivery.yaml"),
+        "salon-booking" => include_str!("../templates/salon-booking.yaml"),
+        "event-tickets" => include_str!("../templates/event-tickets.yaml"),
+        "tutoring" => include_str!("../templates/tutoring.yaml"),
+        "voucher-store" => include_str!("../templates/voucher-store.yaml"),
+        "community-store" => include_str!("../templates/community-store.yaml"),
+        "customer-support" => include_str!("../templates/customer-support.yaml"),
+        "real-estate" => include_str!("../templates/real-estate.yaml"),
+        _ => anyhow::bail!("Unknown template '{}'. Run 'hive templates' to see available templates.", name),
+    };
+    Ok(content.to_string())
+}
+
+/// `hive templates` — list available templates
+fn cmd_templates() -> Result<()> {
+    println!("🐝 Available Hive Templates:\n");
+    println!("  food-delivery      🍔 Restaurant, street food, home kitchen");
+    println!("  salon-booking      💇 Hair salon, barber, spa, nails");
+    println!("  event-tickets      🎟️  Concerts, workshops, classes, meetups");
+    println!("  tutoring           📚 Private lessons, test prep, language learning");
+    println!("  voucher-store      🎁 Gift cards, loyalty programs, prepaid credits");
+    println!("  community-store    🌾 Co-op, farmer's market, local goods");
+    println!("  customer-support   🆘 Help desk, ticket system");
+    println!("  real-estate        🏡 Property listings, rental viewings");
+    println!("\nUsage:");
+    println!("  hive init --template food-delivery my-restaurant");
+    println!("  hive init --template salon-booking my-salon");
+    println!("\nOr use the wizard for interactive setup:");
+    println!("  hive wizard my-business");
+    Ok(())
+}
+
+/// `hive wizard <path>` — interactive setup
+fn cmd_wizard(path: &PathBuf) -> Result<()> {
+    use std::io::{self, Write};
+
+    if path.exists() {
+        anyhow::bail!("Directory {} already exists", path.display());
+    }
+
+    println!("🐝 Hive Setup Wizard\n");
+    println!("Let's build your WhatsApp bot! Answer a few questions:\n");
+
+    // Step 1: Business type
+    println!("1. What type of business are you building?\n");
+    println!("   1. Food delivery");
+    println!("   2. Salon / Beauty booking");
+    println!("   3. Event tickets");
+    println!("   4. Tutoring / Lessons");
+    println!("   5. Voucher / Gift card store");
+    println!("   6. Community store");
+    println!("   7. Customer support");
+    println!("   8. Real estate");
+    println!("   9. Custom (blank template)");
+    print!("\nYour choice (1-9): ");
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let template_choice = input.trim();
+
+    let template = match template_choice {
+        "1" => "food-delivery",
+        "2" => "salon-booking",
+        "3" => "event-tickets",
+        "4" => "tutoring",
+        "5" => "voucher-store",
+        "6" => "community-store",
+        "7" => "customer-support",
+        "8" => "real-estate",
+        "9" => "default",
+        _ => {
+            println!("Invalid choice. Using blank template.");
+            "default"
+        }
+    };
+
+    // Step 2: Business name
+    print!("\n2. What's your business name? ");
+    io::stdout().flush()?;
+    let mut business_name = String::new();
+    io::stdin().read_line(&mut business_name)?;
+    let business_name = business_name.trim();
+
+    // Step 3: Currency
+    print!("\n3. What currency do you use? (USD, EUR, KES, ZAR, etc.) ");
+    io::stdout().flush()?;
+    let mut currency = String::new();
+    io::stdin().read_line(&mut currency)?;
+    let currency = currency.trim().to_uppercase();
+
+    // Step 4: Admin number
+    print!("\n4. Your WhatsApp number (with country code, e.g. +254712345678): ");
+    io::stdout().flush()?;
+    let mut admin_number = String::new();
+    io::stdin().read_line(&mut admin_number)?;
+    let admin_number = admin_number.trim();
+
+    // Create project directory
+    std::fs::create_dir_all(path)?;
+    let data_dir = path.join("data");
+    std::fs::create_dir_all(&data_dir)?;
+
+    // Load template and customize
+    let mut config_content = if template == "default" {
+        DEFAULT_CONFIG.to_string()
+    } else {
+        load_template(template)?
+    };
+
+    // Replace placeholders
+    config_content = config_content.replace("My Business", business_name);
+    config_content = config_content.replace("My Kitchen", business_name);
+    config_content = config_content.replace("My Salon", business_name);
+    config_content = config_content.replace("My Events", business_name);
+    config_content = config_content.replace("My Tutoring", business_name);
+    config_content = config_content.replace("My Vouchers", business_name);
+    config_content = config_content.replace("Community Market", business_name);
+    config_content = config_content.replace("Support Bot", business_name);
+    config_content = config_content.replace("Property Listings", business_name);
+    config_content = config_content.replace("\"USD\"", &format!("\"{}\"", currency));
+    config_content = config_content.replace("\"+1234567890\"", &format!("\"{}\"", admin_number));
+
+    let config_path = path.join("config.yaml");
+    std::fs::write(&config_path, config_content)?;
+
+    println!("\n✅ Bot created at {}", path.display());
+    println!("\nNext steps:");
+    println!("  1. Review & edit: {}/config.yaml", path.display());
+    println!("  2. Run: hive run {}/", path.display());
+    println!("  3. Scan the QR code with WhatsApp\n");
+    println!("🐝 Your bot is ready to go!");
 
     Ok(())
 }

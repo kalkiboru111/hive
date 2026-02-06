@@ -1,0 +1,56 @@
+# Event Tickets Template
+# Perfect for: concerts, workshops, meetups, classes
+
+business:
+  name: "My Events"
+  currency: "USD"
+  welcome: |
+    Welcome to My Events! 🎉
+
+    Reply with a number:
+    1. 🎟️ View Events
+    2. 📦 My Tickets
+    3. 🎁 Redeem Voucher
+    4. ℹ️ About Us
+  about: "Community events, workshops, and gatherings. Secure your spot via WhatsApp!"
+
+menu:
+  - name: "Weekend Workshop: Photography Basics"
+    price: 50.00
+    emoji: "📸"
+    description: "Sat 10am-4pm • Beginner-friendly • Bring your camera"
+  - name: "Friday Night Live Music"
+    price: 20.00
+    emoji: "🎸"
+    description: "Fri 8pm-11pm • Local bands • 21+ only"
+  - name: "Yoga in the Park"
+    price: 15.00
+    emoji: "🧘"
+    description: "Sun 7am-8am • All levels • Bring a mat"
+  - name: "Coding Bootcamp (4 weeks)"
+    price: 200.00
+    emoji: "💻"
+    description: "Mon/Wed 6pm-8pm • Intro to Python • No experience needed"
+  - name: "Kids Art Class"
+    price: 25.00
+    emoji: "🎨"
+    description: "Sat 2pm-4pm • Ages 5-12 • Materials included"
+
+admin_numbers:
+  - "+1234567890"  # REPLACE with your WhatsApp number
+
+messages:
+  order_confirmed: "🎟️ Ticket #{id} confirmed!\n📧 Your ticket will arrive shortly.\n\nSee you there! 🎉"
+  order_received_admin: "🔔 New Ticket Purchase #{id}\n\n{items}\n\nTotal: {currency}{total}\n👤 {location}\n\nGenerate ticket and send confirmation."
+  order_delivered: "✅ Your ticket for #{id} is confirmed! Show this message at the door."
+  voucher_created: "🎁 Promo code {code} — {currency}{amount} off tickets"
+  voucher_redeemed: "✅ Promo {code} applied! {currency}{amount} off."
+  voucher_invalid: "❌ Invalid promo code."
+
+dashboard:
+  port: 8080
+  enabled: true
+
+network:
+  enabled: true
+  l0_url: "http://100.123.52.97:9100"
