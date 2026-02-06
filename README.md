@@ -192,8 +192,8 @@ cargo build --release --features network
 ### Phase 2: SME Features (Q2-Q3 2026)
 - [ ] Enhanced analytics & reporting (export CSV, daily summaries)
 - [ ] SMS fallback (Twilio integration, pay-per-use)
-- [ ] Payment gateway integrations (Stripe, PayStack)
-- [ ] M-Pesa support (Kenya)
+- [x] Payment gateway integrations (M-Pesa)
+- [x] M-Pesa support (Kenya) — STK Push integration
 - [ ] Backup/failover service (Reality nodes offer for $NET)
 - [ ] Voice message support
 - [ ] Delivery tracking integration

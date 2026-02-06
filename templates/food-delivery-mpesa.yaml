@@ -1,0 +1,69 @@
+# Food Delivery with M-Pesa Payments (Kenya)
+# Perfect for: restaurants accepting mobile money
+
+business:
+  name: "Mama Njeri's Kitchen"
+  currency: "KES"
+  phone: "+254712345678"
+  welcome: |
+    🍲 Karibu Mama Njeri's Kitchen!
+
+    Reply with a number:
+    1. 📋 View Menu
+    2. 📦 My Orders
+    3. ℹ️ About Us
+  about: "Authentic Kenyan home cooking. Fresh ugali, nyama choma, and more! 🇰🇪"
+
+menu:
+  - name: "Ugali & Sukuma Wiki"
+    price: 150
+    emoji: "🌿"
+    description: "Traditional ugali with fresh kale"
+  - name: "Nyama Choma (500g)"
+    price: 600
+    emoji: "🥩"
+    description: "Grilled goat meat with kachumbari"
+  - name: "Pilau Rice"
+    price: 250
+    emoji: "🍚"
+    description: "Spiced rice with beef"
+  - name: "Chapati (3pc)"
+    price: 60
+    emoji: "🫓"
+    description: "Soft layered flatbread"
+  - name: "Mukimo"
+    price: 180
+    emoji: "🥔"
+    description: "Mashed potatoes with greens"
+
+delivery:
+  fee: 100
+  estimate_minutes: [45, 60]
+
+admin_numbers:
+  - "+254712345678"  # Owner's number
+
+messages:
+  order_confirmed: "✅ Order #{id} received!\n\n💳 Please pay KES {total} via M-Pesa to complete your order.\n\n⏱ Estimated delivery: {estimate}"
+  order_received_admin: "🔔 New Order #{id}\n\n{items}\n\nTotal: {currency} {total}\n📍 {location}\n\n💰 Payment: Pending M-Pesa\n\nReply DONE {id} when delivered"
+  order_delivered: "🎉 Order #{id} delivered! Asante sana! 😊\n\nRate us: ⭐⭐⭐⭐⭐"
+
+dashboard:
+  port: 8080
+  enabled: true
+
+network:
+  enabled: true
+  l0_url: "http://localhost:7000"
+
+# M-Pesa payment configuration
+# Get credentials from: https://developer.safaricom.co.ke
+payments:
+  enabled: true
+  mpesa:
+    consumer_key: "YOUR_CONSUMER_KEY"
+    consumer_secret: "YOUR_CONSUMER_SECRET"
+    shortcode: "174379"  # Your business shortcode
+    passkey: "YOUR_PASSKEY"
+    callback_url: "https://your-domain.com/mpesa/callback"
+    sandbox: true  # Set to false for production

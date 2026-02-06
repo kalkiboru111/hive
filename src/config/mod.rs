@@ -22,6 +22,8 @@ pub struct HiveConfig {
     pub dashboard: DashboardConfig,
     #[serde(default)]
     pub network: NetworkConfig,
+    #[serde(default)]
+    pub payments: PaymentConfig,
 }
 
 /// Business identity and messaging.
@@ -197,6 +199,37 @@ impl Default for NetworkConfig {
             l0_url: default_l0_url(),
             identity_path: default_identity_path(),
             snapshot_interval_secs: default_snapshot_interval(),
+        }
+    }
+}
+
+/// Payment integration configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaymentConfig {
+    /// Whether payments are enabled.
+    #[serde(default)]
+    pub enabled: bool,
+    /// M-Pesa configuration (Kenya).
+    #[serde(default)]
+    pub mpesa: Option<MpesaConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MpesaConfig {
+    pub consumer_key: String,
+    pub consumer_secret: String,
+    pub shortcode: String,
+    pub passkey: String,
+    pub callback_url: String,
+    #[serde(default)]
+    pub sandbox: bool,
+}
+
+impl Default for PaymentConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mpesa: None,
         }
     }
 }

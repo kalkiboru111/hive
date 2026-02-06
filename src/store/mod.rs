@@ -130,9 +130,26 @@ impl Store {
                 updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS payments (
+                id              TEXT PRIMARY KEY,
+                order_id        INTEGER NOT NULL,
+                amount          REAL NOT NULL,
+                currency        TEXT NOT NULL DEFAULT 'KES',
+                method          TEXT NOT NULL,
+                status          TEXT NOT NULL DEFAULT 'pending',
+                phone           TEXT NOT NULL,
+                reference       TEXT NOT NULL,
+                provider_ref    TEXT,
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (order_id) REFERENCES orders(id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
             CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
             CREATE INDEX IF NOT EXISTS idx_vouchers_code ON vouchers(code);
+            CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+            CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
             ",
         )?;
 
@@ -445,6 +462,117 @@ impl Store {
             total_vouchers,
             redeemed_vouchers,
         })
+    }
+
+    // ─── Payments ────────────────────────────────────────────────────
+
+    /// Create a new payment record. Returns the payment ID.
+    pub fn create_payment(
+        &self,
+        payment_id: &str,
+        order_id: i64,
+        amount: f64,
+        currency: &str,
+        method: &str,
+        phone: &str,
+        reference: &str,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO payments (id, order_id, amount, currency, method, phone, reference)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![payment_id, order_id, amount, currency, method, phone, reference],
+        )?;
+        Ok(())
+    }
+
+    /// Update payment status and provider reference.
+    pub fn update_payment_status(
+        &self,
+        payment_id: &str,
+        status: &str,
+        provider_ref: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE payments SET status = ?1, provider_ref = ?2, updated_at = datetime('now') WHERE id = ?3",
+            params![status, provider_ref, payment_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get payment by ID.
+    pub fn get_payment(&self, payment_id: &str) -> Result<Option<crate::payments::Payment>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, order_id, amount, currency, method, status, phone, reference, provider_ref, created_at, updated_at
+             FROM payments WHERE id = ?1",
+        )?;
+
+        let result = stmt.query_row(params![payment_id], |row| {
+                Ok(crate::payments::Payment {
+                    id: row.get(0)?,
+                    order_id: row.get(1)?,
+                    amount: row.get(2)?,
+                    currency: row.get(3)?,
+                    method: serde_json::from_str(&format!(r#""{}""#, row.get::<_, String>(4)?)).unwrap(),
+                    status: match row.get::<_, String>(5)?.as_str() {
+                        "pending" => crate::payments::PaymentStatus::Pending,
+                        "processing" => crate::payments::PaymentStatus::Processing,
+                        "completed" => crate::payments::PaymentStatus::Completed,
+                        "failed" => crate::payments::PaymentStatus::Failed,
+                        "cancelled" => crate::payments::PaymentStatus::Cancelled,
+                        _ => crate::payments::PaymentStatus::Pending,
+                    },
+                    phone: row.get(6)?,
+                    reference: row.get(7)?,
+                    provider_ref: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            });
+
+        match result {
+            Ok(payment) => Ok(Some(payment)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Get payments for an order.
+    pub fn get_order_payments(&self, order_id: i64) -> Result<Vec<crate::payments::Payment>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, order_id, amount, currency, method, status, phone, reference, provider_ref, created_at, updated_at
+             FROM payments WHERE order_id = ?1 ORDER BY created_at DESC",
+        )?;
+
+        let payments = stmt
+            .query_map(params![order_id], |row| {
+                Ok(crate::payments::Payment {
+                    id: row.get(0)?,
+                    order_id: row.get(1)?,
+                    amount: row.get(2)?,
+                    currency: row.get(3)?,
+                    method: serde_json::from_str(&format!(r#""{}""#, row.get::<_, String>(4)?)).unwrap(),
+                    status: match row.get::<_, String>(5)?.as_str() {
+                        "pending" => crate::payments::PaymentStatus::Pending,
+                        "processing" => crate::payments::PaymentStatus::Processing,
+                        "completed" => crate::payments::PaymentStatus::Completed,
+                        "failed" => crate::payments::PaymentStatus::Failed,
+                        "cancelled" => crate::payments::PaymentStatus::Cancelled,
+                        _ => crate::payments::PaymentStatus::Pending,
+                    },
+                    phone: row.get(6)?,
+                    reference: row.get(7)?,
+                    provider_ref: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(payments)
     }
 }
 

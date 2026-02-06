@@ -8,5 +8,6 @@ pub mod dashboard;
 pub mod handlers;
 pub mod i18n;
 pub mod network;
+pub mod payments;
 pub mod store;
 pub mod vouchers;
