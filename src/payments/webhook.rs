@@ -108,7 +108,9 @@ impl StkCallback {
 pub async fn process_callback(
     callback: MpesaCallback,
     store: &crate::store::Store,
-) -> Result<String> {
+    config: &crate::config::HiveConfig,
+    wa_client: Option<std::sync::Arc<whatsapp_rust::client::Client>>,
+) -> Result<PaymentCallbackResult> {
     let stk = callback.body.stk_callback;
     let checkout_request_id = &stk.checkout_request_id;
     
@@ -118,6 +120,17 @@ pub async fn process_callback(
     // Find payment by provider reference (CheckoutRequestID)
     let payment = store.get_payment_by_provider_ref(checkout_request_id)?
         .ok_or_else(|| anyhow::anyhow!("Payment not found for CheckoutRequestID: {}", checkout_request_id))?;
+
+    // Check idempotency - if already processed, return early
+    if matches!(payment.status, super::types::PaymentStatus::Completed) {
+        info!("⚠️ Payment {} already completed (idempotent retry)", payment.id);
+        return Ok(PaymentCallbackResult {
+            success: true,
+            message: "Already processed".to_string(),
+            order_id: payment.order_id,
+            receipt: None,
+        });
+    }
 
     if stk.is_successful() {
         // Payment successful
@@ -138,7 +151,57 @@ pub async fn process_callback(
         
         info!("💰 Payment {} completed — Order #{} confirmed", payment.id, payment.order_id);
         
-        Ok(format!("Payment completed: {}", details.mpesa_receipt_number))
+        // Notify admin(s) via WhatsApp
+        if let Some(client) = wa_client {
+            let order = store.get_order(payment.order_id)?;
+            if let Some(order) = order {
+                for admin_number in &config.admin_numbers {
+                    let clean_number: String = admin_number.chars().filter(|c| c.is_ascii_digit()).collect();
+                    if !clean_number.is_empty() {
+                        let admin_jid = wacore_binary::jid::Jid::pn(&clean_number);
+                        
+                        let notification = format!(
+                            "💰 *Payment Received*\n\n\
+                             Order #{}\n\
+                             Amount: {}{:.2}\n\
+                             Receipt: {}\n\
+                             Customer: {}\n\
+                             Location: {}\n\n\
+                             ✅ Order confirmed and ready to prepare!",
+                            payment.order_id,
+                            config.business.currency,
+                            details.amount,
+                            details.mpesa_receipt_number,
+                            order.customer_phone,
+                            order.location.as_deref().unwrap_or("No location")
+                        );
+                        
+                        let admin_msg = waproto::whatsapp::Message {
+                            extended_text_message: Some(Box::new(
+                                waproto::whatsapp::message::ExtendedTextMessage {
+                                    text: Some(notification),
+                                    ..Default::default()
+                                },
+                            )),
+                            ..Default::default()
+                        };
+                        
+                        if let Err(e) = client.send_message(admin_jid, admin_msg).await {
+                            log::error!("Failed to notify admin {}: {}", admin_number, e);
+                        } else {
+                            log::info!("📢 Notified admin {} about payment for order #{}", admin_number, payment.order_id);
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(PaymentCallbackResult {
+            success: true,
+            message: format!("Payment completed: {}", details.mpesa_receipt_number),
+            order_id: payment.order_id,
+            receipt: Some(details.mpesa_receipt_number),
+        })
     } else {
         // Payment failed
         warn!("❌ M-Pesa payment failed: ResultCode={}, ResultDesc={}", 
@@ -153,8 +216,22 @@ pub async fn process_callback(
         // Optionally update order status to cancelled or leave as pending for cash
         // For now, leave order as-is (customer can pay cash)
         
-        Ok(format!("Payment failed: {}", stk.result_desc))
+        Ok(PaymentCallbackResult {
+            success: false,
+            message: format!("Payment failed: {}", stk.result_desc),
+            order_id: payment.order_id,
+            receipt: None,
+        })
     }
+}
+
+/// Result of processing a payment callback
+#[derive(Debug, Clone, Serialize)]
+pub struct PaymentCallbackResult {
+    pub success: bool,
+    pub message: String,
+    pub order_id: i64,
+    pub receipt: Option<String>,
 }
 
 #[cfg(test)]

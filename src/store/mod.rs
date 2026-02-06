@@ -88,6 +88,10 @@ pub struct Stats {
     pub total_revenue: f64,
     pub total_vouchers: i64,
     pub redeemed_vouchers: i64,
+    pub total_payments: i64,
+    pub completed_payments: i64,
+    pub failed_payments: i64,
+    pub payment_revenue: f64,
 }
 
 impl Store {
@@ -455,6 +459,30 @@ impl Store {
             |row| row.get(0),
         )?;
 
+        let total_payments: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM payments",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let completed_payments: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM payments WHERE status = 'completed'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let failed_payments: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM payments WHERE status = 'failed'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let payment_revenue: f64 = conn.query_row(
+            "SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed'",
+            [],
+            |row| row.get(0),
+        )?;
+
         Ok(Stats {
             total_orders,
             pending_orders,
@@ -462,6 +490,10 @@ impl Store {
             total_revenue,
             total_vouchers,
             redeemed_vouchers,
+            total_payments,
+            completed_payments,
+            failed_payments,
+            payment_revenue,
         })
     }
 

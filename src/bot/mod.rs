@@ -34,6 +34,7 @@ pub struct BotEngine {
     phone_number: Option<String>,
     network_notifier: NetworkNotifier,
     payment_provider: Option<Arc<dyn PaymentProvider>>,
+    wa_client_shared: Option<Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>>,
 }
 
 impl BotEngine {
@@ -89,12 +90,22 @@ impl BotEngine {
             phone_number: None,
             network_notifier,
             payment_provider,
+            wa_client_shared: None,
         })
     }
 
     /// Set a phone number for pair code authentication (alternative to QR scanning).
     pub fn with_phone_number(mut self, phone: String) -> Self {
         self.phone_number = Some(phone);
+        self
+    }
+
+    /// Set shared WhatsApp client for dashboard access.
+    pub fn with_wa_client_shared(
+        mut self,
+        shared: Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>,
+    ) -> Self {
+        self.wa_client_shared = Some(shared);
         self
     }
 
@@ -118,6 +129,7 @@ impl BotEngine {
         let store = self.store.clone();
         let network_notifier = self.network_notifier.clone();
         let payment_provider = self.payment_provider.clone();
+        let wa_client_shared = self.wa_client_shared.clone();
 
         let mut builder = Bot::builder()
             .with_backend(backend)
@@ -139,6 +151,7 @@ impl BotEngine {
                 let store = store.clone();
                 let network_notifier = network_notifier.clone();
                 let payment_provider = payment_provider.clone();
+                let wa_client_shared = wa_client_shared.clone();
                 async move {
                     match event {
                         Event::PairingQrCode { code, timeout } => {
@@ -183,6 +196,13 @@ impl BotEngine {
                         }
                         Event::Connected(_) => {
                             info!("✅ Connected to WhatsApp!");
+                            
+                            // Populate shared client for dashboard webhook access
+                            if let Some(ref shared) = wa_client_shared {
+                                let mut client_lock = shared.write().await;
+                                *client_lock = Some(client.clone());
+                                info!("📡 WhatsApp client shared with dashboard");
+                            }
                         }
                         Event::Disconnected(_) => {
                             warn!("⚠️  Disconnected from WhatsApp");

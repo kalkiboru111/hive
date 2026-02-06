@@ -324,12 +324,16 @@ async fn cmd_run(path: &PathBuf, phone: Option<String>) -> Result<()> {
     let store = store::Store::new(db_path.to_str().unwrap())
         .with_context(|| "Failed to initialize database")?;
 
+    // Create shared WhatsApp client (populated after bot connects)
+    let wa_client_shared = std::sync::Arc::new(tokio::sync::RwLock::new(None));
+
     // Start dashboard in background if enabled
     let dashboard_handle = if config.dashboard.enabled {
         let dashboard_config = config.clone();
         let dashboard_store = store.clone();
+        let dashboard_client = wa_client_shared.clone();
         Some(tokio::spawn(async move {
-            if let Err(e) = dashboard::run_dashboard(dashboard_config, dashboard_store).await {
+            if let Err(e) = dashboard::run_dashboard(dashboard_config, dashboard_store, dashboard_client).await {
                 log::error!("Dashboard error: {}", e);
             }
         }))
@@ -342,6 +346,7 @@ async fn cmd_run(path: &PathBuf, phone: Option<String>) -> Result<()> {
     if let Some(phone) = phone {
         engine = engine.with_phone_number(phone);
     }
+    engine = engine.with_wa_client_shared(wa_client_shared);
     engine.run().await?;
 
     // Wait for dashboard if it was started
@@ -366,5 +371,8 @@ async fn cmd_dashboard(path: &PathBuf) -> Result<()> {
         config.business.name, config.dashboard.port
     );
 
-    dashboard::run_dashboard(config, store).await
+    // Dashboard-only mode: no WhatsApp client (webhooks won't send notifications)
+    let wa_client_shared = std::sync::Arc::new(tokio::sync::RwLock::new(None));
+
+    dashboard::run_dashboard(config, store, wa_client_shared).await
 }

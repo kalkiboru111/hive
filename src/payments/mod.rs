@@ -5,13 +5,15 @@
 //! - PayStack (Nigeria, Ghana, South Africa) - Card payments
 //! - Stripe (International) - Coming soon
 
+pub mod b2c;
 pub mod mpesa;
 pub mod types;
 pub mod webhook;
 
+pub use b2c::{B2CClient, B2CConfig, B2CTransactionType};
 pub use mpesa::MpesaClient;
 pub use types::{Payment, PaymentMethod, PaymentStatus};
-pub use webhook::{MpesaCallback, PaymentDetails, process_callback};
+pub use webhook::{MpesaCallback, PaymentCallbackResult, process_callback};
 
 use anyhow::Result;
 

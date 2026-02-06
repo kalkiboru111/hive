@@ -77,7 +77,7 @@ Each template includes pre-filled menu items, messages, and settings — just cu
 - **Config-driven** — define your bot in YAML, no coding required
 - **Menu & ordering** — built-in support for product catalogs and order flows
 - **Vouchers** — create and redeem voucher codes
-- **M-Pesa payments** 🇰🇪 — integrated STK Push for Kenya (see [M-Pesa guide](docs/MPESA_INTEGRATION.md))
+- **M-Pesa payments** 🇰🇪 — STK Push, webhooks, admin notifications, reconciliation, B2C refunds ([guide](docs/MPESA_INTEGRATION.md) | [advanced](docs/MPESA_ADVANCED.md))
 - **Admin notifications** — owner gets order alerts via WhatsApp
 - **Web dashboard** — manage menu, orders, and analytics from a browser
 - **Decentralized hosting** — runs on Reality Network, powered by your community

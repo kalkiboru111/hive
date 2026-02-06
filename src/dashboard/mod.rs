@@ -11,7 +11,7 @@
 //! - GET  /api/stats        — aggregate statistics
 
 use crate::config::HiveConfig;
-use crate::payments::{MpesaCallback, process_callback};
+use crate::payments::{B2CClient, MpesaCallback, process_callback};
 use crate::store::{OrderStatus, Store};
 use anyhow::Result;
 use axum::{
@@ -30,16 +30,34 @@ use tower_http::cors::CorsLayer;
 struct AppState {
     config: Arc<HiveConfig>,
     store: Store,
+    wa_client: Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>,
+    b2c_client: Option<Arc<B2CClient>>,
 }
 
 /// Embedded dashboard HTML (compiled into binary).
 const DASHBOARD_HTML: &str = include_str!("../../static/dashboard.html");
 
 /// Start the dashboard web server.
-pub async fn run_dashboard(config: HiveConfig, store: Store) -> Result<()> {
+pub async fn run_dashboard(
+    config: HiveConfig,
+    store: Store,
+    wa_client: Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>,
+) -> Result<()> {
+    // Initialize B2C client if configured
+    let b2c_client = if let Some(ref mpesa_cfg) = config.payments.mpesa {
+        // B2C requires additional config beyond STK Push
+        // For now, skip B2C initialization (requires separate credentials)
+        // TODO: Add b2c config to payments section
+        None
+    } else {
+        None
+    };
+
     let state = AppState {
         config: Arc::new(config.clone()),
         store,
+        wa_client,
+        b2c_client,
     };
 
     let app = Router::new()
@@ -50,6 +68,9 @@ pub async fn run_dashboard(config: HiveConfig, store: Store) -> Result<()> {
         .route("/api/vouchers", get(list_vouchers).post(create_voucher))
         .route("/api/stats", get(get_stats))
         .route("/api/health", get(health_check))
+        .route("/api/payments", get(list_payments))
+        .route("/api/payments/{id}", get(get_payment))
+        .route("/api/payments/{id}/refund", post(refund_payment))
         .route("/api/mpesa/callback", post(mpesa_callback))
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -207,9 +228,15 @@ async fn mpesa_callback(
 ) -> impl IntoResponse {
     log::info!("📥 M-Pesa callback received");
     
-    match process_callback(callback, &state.store).await {
-        Ok(message) => {
-            log::info!("✅ {}", message);
+    // Get WhatsApp client (may be None if bot not connected yet)
+    let wa_client = {
+        let client_lock = state.wa_client.read().await;
+        client_lock.clone()
+    };
+    
+    match process_callback(callback, &state.store, &state.config, wa_client).await {
+        Ok(result) => {
+            log::info!("✅ {}", result.message);
             (StatusCode::OK, Json(serde_json::json!({
                 "ResultCode": 0,
                 "ResultDesc": "Accepted"
@@ -221,6 +248,122 @@ async fn mpesa_callback(
                 "ResultCode": 1,
                 "ResultDesc": format!("Error: {}", e)
             }))).into_response()
+        }
+    }
+}
+
+/// List all payments with optional filtering
+async fn list_payments(State(state): State<AppState>) -> impl IntoResponse {
+    // For now, get all payments by querying each order
+    // TODO: Add direct payments query to store
+    match state.store.list_orders(None) {
+        Ok(orders) => {
+            let mut all_payments = Vec::new();
+            for order in orders {
+                if let Ok(payments) = state.store.get_order_payments(order.id) {
+                    all_payments.extend(payments);
+                }
+            }
+            
+            // Sort by created_at descending
+            all_payments.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            
+            (StatusCode::OK, Json(all_payments)).into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiError {
+                error: e.to_string(),
+            }),
+        )
+            .into_response(),
+    }
+}
+
+/// Get single payment by ID
+async fn get_payment(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.store.get_payment(&id) {
+        Ok(Some(payment)) => (StatusCode::OK, Json(payment)).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(ApiError {
+            error: "Payment not found".to_string(),
+        })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiError {
+                error: e.to_string(),
+            }),
+        )
+            .into_response(),
+    }
+}
+
+/// Refund a completed payment
+async fn refund_payment(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    // Check if B2C is configured
+    let b2c = match state.b2c_client.as_ref() {
+        Some(client) => client,
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ApiError {
+                    error: "M-Pesa B2C (refunds) not configured. Contact admin.".to_string(),
+                }),
+            ).into_response();
+        }
+    };
+
+    // Get payment
+    let payment = match state.store.get_payment(&id) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return (StatusCode::NOT_FOUND, Json(ApiError {
+                error: "Payment not found".to_string(),
+            })).into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    error: e.to_string(),
+                }),
+            ).into_response();
+        }
+    };
+
+    // Check if payment is completed
+    if !matches!(payment.status, crate::payments::PaymentStatus::Completed) {
+        return (StatusCode::BAD_REQUEST, Json(ApiError {
+            error: "Can only refund completed payments".to_string(),
+        })).into_response();
+    }
+
+    // Initiate B2C refund
+    match b2c.refund_payment(payment.amount, &payment.phone, payment.order_id).await {
+        Ok(conversation_id) => {
+            log::info!("💸 Refund initiated for payment {}: ConversationID={}", payment.id, conversation_id);
+            (StatusCode::OK, Json(serde_json::json!({
+                "success": true,
+                "conversation_id": conversation_id,
+                "message": format!("Refund of {}{} initiated to {}", 
+                                  state.config.business.currency, 
+                                  payment.amount, 
+                                  payment.phone)
+            }))).into_response()
+        }
+        Err(e) => {
+            log::error!("❌ Refund failed for payment {}: {}", payment.id, e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    error: format!("Refund failed: {}", e),
+                }),
+            ).into_response()
         }
     }
 }
