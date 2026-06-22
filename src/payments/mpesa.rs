@@ -69,6 +69,7 @@ struct StkPushRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // mirrors the full M-Pesa STK Push API response; not every field is read
 struct StkPushResponse {
     #[serde(rename = "MerchantRequestID")]
     merchant_request_id: Option<String>,
@@ -251,7 +252,7 @@ impl PaymentProvider for MpesaClient {
         Ok(checkout_request_id)
     }
 
-    async fn check_status(&self, payment_id: &str) -> Result<PaymentStatus> {
+    async fn check_status(&self, _payment_id: &str) -> Result<PaymentStatus> {
         // M-Pesa status check requires the CheckoutRequestID
         // In a real implementation, you'd query the STK Push status endpoint
         // For now, we rely on the callback webhook to update payment status

@@ -53,8 +53,8 @@ dashboard:
   enabled: true
 
 network:
-  enabled: true
-  l0_url: "http://localhost:7000"
+  enabled: false
+  l0_url: "http://143.110.227.9:9000"
 
 # M-Pesa payment configuration
 # Get credentials from: https://developer.safaricom.co.ke

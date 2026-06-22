@@ -18,10 +18,23 @@ pub struct RealityClient {
 
 impl RealityClient {
     /// Create a new client pointing at an L0 node.
+    ///
+    /// The HTTP client is configured with connect and request timeouts so a
+    /// hung or unreachable node can never block a request indefinitely.
     pub fn new(base_url: &str) -> Self {
+        let client = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            // build() only fails if the TLS backend can't initialize — the same
+            // condition under which reqwest::Client::new() itself panics. We
+            // expect() here (rather than falling back to a no-timeout client)
+            // so the timeout guarantee always holds.
+            .expect("failed to build HTTP client");
+
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
-            client: reqwest::Client::new(),
+            client,
         }
     }
 

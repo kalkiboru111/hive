@@ -40,3 +40,16 @@ admin_numbers: []
 dashboard:
   port: 8080
   enabled: true
+  # bind_host defaults to 127.0.0.1 (loopback only — not exposed to the network).
+  # To reach it from another machine, set bind_host: "0.0.0.0" AND set auth_token
+  # (and ideally put it behind a TLS reverse proxy).
+  # bind_host: "127.0.0.1"
+  # auth_token: "change-me"   # HTTP Basic auth: any username, password = this token
+
+# Reality Network integration.
+# Each bot is its own rApp. Before snapshots are accepted, you must deploy your
+# rApp on the testnet and point hive at the same key — see docs/DEPLOY.md.
+# Leave disabled until you've completed deployment.
+network:
+  enabled: false
+  l0_url: "http://143.110.227.9:9000"

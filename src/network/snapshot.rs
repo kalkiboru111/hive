@@ -7,6 +7,7 @@
 use super::types::StateChannelSnapshotBinary;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// Hive-specific state that gets serialized into a state channel snapshot.
 ///
@@ -59,6 +60,20 @@ impl HiveStateSnapshot {
         Ok(snapshot)
     }
 
+    /// Content hash of this snapshot, ignoring the timestamp.
+    ///
+    /// Used to decide whether the *meaningful* state changed since the last
+    /// submission — the timestamp moves every capture, so it is excluded so
+    /// that an unchanged business state does not trigger redundant submissions.
+    pub fn content_hash(&self) -> String {
+        let mut stable = self.clone();
+        stable.timestamp_ms = 0;
+        // Serialize deterministically and hash. MessagePack of the same struct
+        // is stable for our purposes (no maps with nondeterministic ordering).
+        let bytes = rmp_serde::to_vec(&stable).unwrap_or_default();
+        hex::encode(Sha256::digest(&bytes))
+    }
+
     /// Build a StateChannelSnapshotBinary ready for submission.
     pub fn to_state_channel_binary(
         &self,
@@ -79,16 +94,30 @@ pub fn capture_state(
 ) -> Result<HiveStateSnapshot> {
     let stats = store.get_stats()?;
 
-    // Hash each order for on-chain proof without exposing PII
+    // Hash each order for on-chain proof without exposing PII.
+    //
+    // Uses SHA256 (not std DefaultHasher, which is collision-prone and is
+    // explicitly *not* guaranteed stable across Rust releases/platforms — a
+    // non-starter for hashes meant to serve as a durable proof of existence).
+    //
+    // The order's `status` is part of the preimage so that a status transition
+    // changes the order hash (and therefore the snapshot's content hash). The
+    // service gates submissions on a content-hash diff, so omitting status here
+    // would silently drop real state changes — e.g. an order moving
+    // confirmed → preparing → delivering, which leaves all the aggregate counts
+    // unchanged.
     let orders = store.list_orders(None)?;
     let order_hashes: Vec<String> = orders
         .iter()
         .map(|o| {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut hasher = DefaultHasher::new();
-            format!("{}:{}:{}", o.id, o.total, o.customer_phone).hash(&mut hasher);
-            format!("{:016x}", hasher.finish())
+            let preimage = format!(
+                "{}:{}:{}:{}",
+                o.id,
+                o.total,
+                o.customer_phone,
+                o.status.as_str()
+            );
+            hex::encode(Sha256::digest(preimage.as_bytes()))
         })
         .collect();
 
@@ -97,10 +126,10 @@ pub fn capture_state(
         business_name: business_name.to_string(),
         timestamp_ms: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as u64,
         total_orders: stats.total_orders as u64,
-        total_revenue_cents: (stats.total_revenue * 100.0) as i64,
+        total_revenue_cents: (stats.total_revenue * 100.0).round() as i64,
         active_orders: stats.pending_orders as u32,
         delivered_orders: stats.delivered_orders as u64,
         vouchers: VoucherStateSummary {
@@ -168,5 +197,58 @@ mod tests {
         let binary = snapshot.to_state_channel_binary("previous_hash_here").unwrap();
         assert_eq!(binary.last_snapshot_hash, "previous_hash_here");
         assert!(!binary.content_unsigned().is_empty());
+    }
+
+    fn sample() -> HiveStateSnapshot {
+        HiveStateSnapshot {
+            version: 1,
+            business_name: "Cloudy".to_string(),
+            timestamp_ms: 1700000000000,
+            total_orders: 5,
+            total_revenue_cents: 3500,
+            active_orders: 1,
+            delivered_orders: 4,
+            vouchers: VoucherStateSummary {
+                total_created: 0,
+                total_redeemed: 0,
+                total_value_created_cents: 0,
+                total_value_redeemed_cents: 0,
+            },
+            order_hashes: vec![],
+        }
+    }
+
+    #[test]
+    fn test_content_hash_ignores_timestamp() {
+        let mut a = sample();
+        let mut b = sample();
+        a.timestamp_ms = 1;
+        b.timestamp_ms = 999_999;
+        // Same business state, different timestamp → same content hash.
+        assert_eq!(a.content_hash(), b.content_hash());
+
+        // A meaningful change must change the content hash.
+        b.total_orders = 6;
+        assert_ne!(a.content_hash(), b.content_hash());
+    }
+
+    #[test]
+    fn test_content_hash_tracks_order_hashes() {
+        // A change in the per-order hashes (e.g. an order status transition,
+        // which is part of the order-hash preimage in capture_state) must move
+        // the content hash so the service's content-diff gate submits it.
+        let mut a = sample();
+        let mut b = sample();
+        a.order_hashes = vec!["aa".to_string()];
+        b.order_hashes = vec!["bb".to_string()];
+        assert_ne!(a.content_hash(), b.content_hash());
+    }
+
+    #[test]
+    fn test_content_hash_is_sha256_hex() {
+        // 32-byte SHA256 → 64 lowercase hex chars.
+        let h = sample().content_hash();
+        assert_eq!(h.len(), 64);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }

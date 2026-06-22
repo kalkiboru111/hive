@@ -16,11 +16,13 @@ use crate::store::{OrderStatus, Store};
 use anyhow::Result;
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::{Html, IntoResponse},
+    extract::{Path, Query, Request, State},
+    http::{StatusCode, header},
+    middleware::{self, Next},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -43,15 +45,10 @@ pub async fn run_dashboard(
     store: Store,
     wa_client: Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>,
 ) -> Result<()> {
-    // Initialize B2C client if configured
-    let b2c_client = if let Some(ref mpesa_cfg) = config.payments.mpesa {
-        // B2C requires additional config beyond STK Push
-        // For now, skip B2C initialization (requires separate credentials)
-        // TODO: Add b2c config to payments section
-        None
-    } else {
-        None
-    };
+    // B2C (refunds/payouts) is out of scope for this release: the client code
+    // exists (src/payments/b2c.rs) but separate B2C credentials are not yet
+    // wired into config, so the refund endpoint stays disabled.
+    let b2c_client: Option<Arc<B2CClient>> = None;
 
     let state = AppState {
         config: Arc::new(config.clone()),
@@ -60,14 +57,22 @@ pub async fn run_dashboard(
         b2c_client,
     };
 
-    let app = Router::new()
+    // Public routes: health + the M-Pesa webhook callbacks. The callbacks MUST
+    // stay unauthenticated so Safaricom can reach them; they carry no admin data.
+    let public = Router::new()
+        .route("/api/health", get(health_check))
+        .route("/api/mpesa/callback", post(mpesa_callback))
+        .route("/api/mpesa/b2c/callback", post(mpesa_b2c_callback));
+
+    // Admin routes: the dashboard page + everything that exposes orders, PII,
+    // payments, or mutations. Protected by Basic auth when auth_token is set.
+    let mut admin = Router::new()
         .route("/", get(serve_dashboard))
         .route("/api/orders", get(list_orders))
         .route("/api/orders/{id}", get(get_order))
         .route("/api/menu", get(get_menu))
         .route("/api/vouchers", get(list_vouchers).post(create_voucher))
         .route("/api/stats", get(get_stats))
-        .route("/api/health", get(health_check))
         .route("/api/payments", get(list_payments))
         .route("/api/payments/{id}", get(get_payment))
         .route("/api/payments/{id}/refund", post(refund_payment))
@@ -75,19 +80,66 @@ pub async fn run_dashboard(
         .route("/api/refunds/{id}", get(get_refund))
         .route("/api/export/ledger", get(export_ledger))
         .route("/api/analytics/payments", get(payment_analytics))
-        .route("/api/reconciliation/report", get(reconciliation_report))
-        .route("/api/mpesa/callback", post(mpesa_callback))
-        .route("/api/mpesa/b2c/callback", post(mpesa_b2c_callback))
+        .route("/api/reconciliation/report", get(reconciliation_report));
+
+    if config.dashboard.effective_auth_token().is_some() {
+        admin = admin.route_layer(middleware::from_fn_with_state(state.clone(), require_basic_auth));
+    }
+
+    let app = public
+        .merge(admin)
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr = format!("0.0.0.0:{}", config.dashboard.port);
-    log::info!("🌐 Dashboard running at http://localhost:{}", config.dashboard.port);
+    let bind_host = config.dashboard.bind_host.clone();
+    let port = config.dashboard.port;
+    let is_loopback = matches!(bind_host.as_str(), "127.0.0.1" | "localhost" | "::1");
+    if !is_loopback && config.dashboard.effective_auth_token().is_none() {
+        log::warn!(
+            "⚠️  Dashboard is bound to {} (network-exposed) with NO auth_token set. \
+             Anyone who can reach port {} can read orders/PII and create vouchers. \
+             Set dashboard.auth_token, bind to 127.0.0.1, or front it with an authenticated proxy.",
+            bind_host, port
+        );
+    }
+
+    let addr = format!("{}:{}", bind_host, port);
+    log::info!("🌐 Dashboard listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// HTTP Basic auth guard for the admin routes (active when `auth_token` is set).
+///
+/// Accepts any username; the password must equal the configured token. Returns
+/// 401 with a `WWW-Authenticate` challenge so browsers prompt for credentials.
+async fn require_basic_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
+    let Some(expected) = state.config.dashboard.effective_auth_token() else {
+        return next.run(req).await;
+    };
+
+    let provided = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Basic "))
+        .and_then(|b64| base64::engine::general_purpose::STANDARD.decode(b64).ok())
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .map(|creds| creds.split_once(':').map(|(_, pw)| pw.to_string()).unwrap_or(creds));
+
+    if provided.as_deref() == Some(expected) {
+        next.run(req).await
+    } else {
+        (
+            StatusCode::UNAUTHORIZED,
+            [(header::WWW_AUTHENTICATE, "Basic realm=\"hive dashboard\"")],
+            "Unauthorized",
+        )
+            .into_response()
+    }
 }
 
 // ─── Query parameters ────────────────────────────────────────────

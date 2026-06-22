@@ -246,15 +246,15 @@ Access it at: `http://localhost:8080` (from the same device running Hive)
 
 ```yaml
 network:
-  enabled: true
-  l0_url: "http://100.123.52.97:9100"
+  enabled: false   # turn on after deploying your rApp (see docs/DEPLOY.md)
+  l0_url: "http://143.110.227.9:9000"   # Reality testnet L0
 ```
 
 **What this does:**
-- Syncs orders to Reality Network (decentralized backup)
-- Enables future features (payments, multi-device, franchising)
+- Records your bot's order/voucher state on the Reality testnet (decentralized, on-chain proof).
 
-**Not ready yet?** Set `enabled: false`.
+**Important:** each bot is its own **rApp** and must be deployed once before the testnet accepts
+its snapshots. See **[DEPLOY.md](DEPLOY.md)**. Leave `enabled: false` until you've deployed.
 
 ---
 
@@ -396,15 +396,12 @@ Creates a R50 discount code customers can redeem.
 
 ---
 
-### 🚀 Publish to Reality Network
+### 🚀 Deploy to the Reality testnet
 
-**Coming soon:** One-click deploy your bot as an rApp. Anyone can run a copy, you earn fees.
+Each bot is its own **rApp**. Register yours on the testnet so its activity is recorded
+on-chain. This uses Reality's keytool + wallet tooling (there is no `./hive publish` command).
 
-```bash
-./hive publish
-```
-
-This makes your bot **franchisable** — others run it, you get a cut.
+**Full steps:** [DEPLOY.md](DEPLOY.md)
 
 ---
 
