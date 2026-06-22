@@ -1,10 +1,14 @@
 [package]
 name = "hive"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A WhatsApp bot framework for decentralized hosting on Reality Network"
+authors = ["Reality Foundation"]
 license = "MIT"
-repository = "https://github.com/reality-foundation/hive"
+repository = "https://github.com/kalkiboru111/hive"
+readme = "README.md"
+keywords = ["whatsapp", "bot", "decentralized", "reality-network", "rapp"]
+categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
 # WhatsApp client

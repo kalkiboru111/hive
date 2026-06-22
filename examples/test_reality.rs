@@ -2,7 +2,7 @@
 //!
 //! Usage: cargo run --example test_reality
 //!
-//! Expects a Reality L0 node at http://localhost:7000
+//! Expects a Reality L0 node at http://143.110.227.9:9000
 
 use hive::network::client::RealityClient;
 use hive::network::identity::NodeIdentity;
@@ -13,7 +13,7 @@ use hive::network::snapshot::VoucherStateSummary;
 async fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let cluster_url = std::env::var("REALITY_URL").unwrap_or("http://localhost:7000".into());
+    let cluster_url = std::env::var("REALITY_URL").unwrap_or("http://143.110.227.9:9000".into());
     println!("🔗 Connecting to Reality cluster at {}", cluster_url);
 
     let client = RealityClient::new(&cluster_url);

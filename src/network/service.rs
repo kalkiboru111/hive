@@ -80,9 +80,18 @@ impl NetworkService {
     ) -> Result<(Self, NetworkNotifier)> {
         let client = RealityClient::new(&config.l0_url);
 
-        // Load or generate node identity
+        // Resolve the node identity. If the operator configured the rApp key
+        // (the one used to deploy — see docs/DEPLOY.md), adopt it so the deploy
+        // address and the snapshot-signing key match; otherwise load/generate a
+        // local key.
         let identity_path = project_dir.join(&config.identity_path);
-        let identity = NodeIdentity::load_or_generate(&identity_path)?;
+        let identity = match config.identity_key_hex.as_deref() {
+            Some(hex) if !hex.trim().is_empty() => {
+                info!("🔑 Using configured rApp identity key");
+                NodeIdentity::from_secret_key_hex(hex)?
+            }
+            _ => NodeIdentity::load_or_generate(&identity_path)?,
+        };
         info!(
             "🔗 Reality Network identity: {} (peer: {}...)",
             identity.address,

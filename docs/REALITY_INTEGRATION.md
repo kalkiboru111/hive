@@ -115,45 +115,34 @@ Edit `config.yaml`:
 
 ```yaml
 network:
-  enabled: true                         # Enable Reality Network sync
-  l0_url: "http://localhost:9100"       # L0 node endpoint
-  identity_path: "data/identity.json"   # Where to store identity
-  snapshot_interval_secs: 30            # How often to submit
+  enabled: false                        # turn on after deploying your rApp (see DEPLOY.md)
+  l0_url: "http://143.110.227.9:9000"   # Reality testnet global L0 (genesis)
+  identity_path: "data/identity.json"   # local identity (used if identity_key_hex unset)
+  identity_key_hex: "<deployed rApp key>"  # the key you deployed with — see DEPLOY.md
+  snapshot_interval_secs: 30            # how often to submit
 ```
 
-**Common endpoints:**
-- **Local cluster:** `http://localhost:7100` (port 7100 to avoid conflict with live nodes)
-- **Live Sentiment testnet:** `http://localhost:9100` (Mac Mini Tailscale, DO NOT USE for testing)
-- **Mainnet:** (TBD)
+**Endpoints:**
+- **Reality testnet L0 (genesis):** `http://143.110.227.9:9000`
+- **Your own node:** run the reality-combined jar locally and point `l0_url` at it.
 
-⚠️ **CRITICAL:** The Mac Mini runs Sentiment at `100.123.52.97:9100` (Tailscale). This resolves to `localhost:9100` locally. Always use port `7100` for local testing to avoid interfering with live rApps.
+> ⚠️ Each Hive bot is its own **rApp**. The testnet accepts your snapshots only after you deploy
+> the rApp once with Reality's tooling — see **[DEPLOY.md](DEPLOY.md)**. Until then keep
+> `network.enabled: false`.
 
 ---
 
-## Testing with Local Cluster
+## Testing against the testnet
 
-### 1. Start Reality Cluster
+### 1. Deploy your rApp (one-time)
 
+Register your rApp and obtain its identity key — see **[DEPLOY.md](DEPLOY.md)**. (To test against
+a node you control instead, run the reality-combined jar locally and use its URL.)
+
+**Verify the L0 is reachable:**
 ```bash
-cd /Users/bobeirne/Downloads/reality-main
-docker-compose -f docker-compose.dev.yml up -d
-```
-
-**Verify:**
-```bash
-curl http://localhost:9100/cluster/info | jq
-```
-
-Expected output:
-```json
-[
-  {
-    "id": "642503c6b909ffe3...",
-    "ip": "127.0.0.1",
-    "publicPort": 9100,
-    "state": "Ready"
-  }
-]
+curl http://143.110.227.9:9000/cluster/info | jq
+curl http://143.110.227.9:9000/global-snapshots/latest/ordinal
 ```
 
 ---
@@ -163,7 +152,8 @@ Expected output:
 ```yaml
 network:
   enabled: true
-  l0_url: "http://localhost:9100"
+  l0_url: "http://143.110.227.9:9000"
+  identity_key_hex: "<your deployed rApp key>"
 ```
 
 ---
@@ -176,8 +166,9 @@ network:
 
 **Watch for:**
 ```
-✅ Reality cluster reachable: 1 node(s)
+🔑 Using configured rApp identity key
 🌐 Reality Network service started
+✅ Snapshot submitted to Reality Network
 ```
 
 ---
@@ -202,7 +193,7 @@ tail -f my-bot/logs/hive.log | grep snapshot
 
 **Query Reality Network:**
 ```bash
-curl http://localhost:9100/state-channels/NET1hrf37iZr564XaGj3WYmVA6ko2ipNiPE5s8U6/snapshots/latest
+curl http://143.110.227.9:9000/state-channels/<your-rapp-address>/snapshots/latest
 ```
 
 ---
@@ -275,9 +266,9 @@ Each Hive bot = a state channel on Reality Network.
 **Cause:** L0 node not running or wrong URL.
 
 **Fix:**
-1. Check Docker: `docker ps | grep reality`
-2. Test endpoint: `curl http://localhost:9100/cluster/info`
-3. Verify config: `l0_url` matches running node
+1. Test the endpoint: `curl http://143.110.227.9:9000/cluster/info`
+2. Verify `l0_url` in config.yaml is correct and reachable from this machine.
+3. If using your own node, confirm it's running.
 
 ---
 

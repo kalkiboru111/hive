@@ -1,244 +1,221 @@
 # 🐝 Hive — WhatsApp Bot Framework for Reality Network
 
-Build and run WhatsApp bots on decentralized infrastructure. No cloud. No monthly fees. Your device, your bot, your business.
+Build and run WhatsApp commerce bots — ordering, bookings, vouchers, payments — and host
+them on the decentralized [Reality Network](https://github.com/reality-foundation) instead of
+renting cloud infrastructure. One self-contained binary. Your device, your bot, your business.
 
-## What is Hive?
+> **Status:** Public **testnet** release (`v0.2.0`). Hive runs as a **rApp** on the Reality
+> testnet (global L0 genesis: `http://143.110.227.9:9000`). WhatsApp commerce, the local
+> dashboard, and M-Pesa STK push are wired end-to-end; Reality snapshot submission has been
+> verified against the testnet node.
 
-Hive is a framework that lets anyone create a WhatsApp-based business — ordering systems, customer service, booking, vouchers — and host it on their own device via [Reality Network](https://realitynet.xyz). Zero cloud costs. Works on a laptop or phone.
+---
 
-**✅ Full Reality Network integration validated February 6, 2026** — [See test results](#reality-network-integration)
+## How it fits together
 
-## Quick Start
+Hive is a **rApp** (Reality application). Each bot instance is its **own rApp**, identified by
+its own key. At runtime hive captures business state (orders, vouchers, revenue) and its rApp
+L0 submits signed **state-channel snapshots** up to the Reality global L0, where they're
+included in global consensus.
 
-### For Builders (Non-Technical)
-
-**👉 [Start here: FOR_BUILDERS.md](FOR_BUILDERS.md)**
-
-Use the interactive wizard:
-
-```bash
-./hive wizard my-business
-# Answer 4 questions, your config is ready
-./hive run my-business/
-# Scan QR, bot is live
+```
+Your device (laptop / phone / node)
+├── WhatsApp connection (whatsapp-rust)
+├── Bot engine (routing + conversation state)
+├── Config + handlers (YAML-driven: menu, messages, payments)
+├── Local web dashboard (admin panel, localhost only)
+├── SQLite (orders, vouchers, payments, sessions)
+└── rApp L0 submitter (src/network) ── signed snapshots ──▶ Reality global L0
 ```
 
-### For Developers
+Before the network accepts an instance's snapshots, that instance must be **registered
+on-chain** with a `createDeployAppTransaction`. Deployment is done with **Reality's own
+tooling** (keytool + wallet CLI) — hive is the app being posted, not the deployer. See
+**[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+---
+
+## Install
+
+**Prebuilt binary:**
 
 ```bash
-# Use a template
-./hive init --template food-delivery my-bot
-
-# Or start from scratch
-./hive init my-bot
-
-# Edit your config
-nano my-bot/config.yaml
-
-# Run it
-./hive run my-bot/
+curl -fsSL https://raw.githubusercontent.com/kalkiboru111/hive/main/setup.sh | bash
 ```
 
-**See all templates:**
+**From source** (Rust toolchain pinned in `rust-toolchain.toml`):
 
 ```bash
-./hive templates
+git clone https://github.com/kalkiboru111/hive
+cd hive
+cargo build --release
+# binary at target/release/hive
 ```
+
+---
+
+## Quick start
+
+### Builders (non-technical)
+
+**👉 [FOR_BUILDERS.md](FOR_BUILDERS.md)** walks through everything. The fast path:
+
+```bash
+./hive wizard my-business     # answer a few questions, config is generated
+./hive run my-business/       # scan the QR with WhatsApp — bot is live
+```
+
+### Developers
+
+```bash
+./hive init --template food-delivery my-bot   # scaffold from a template
+nano my-bot/config.yaml                         # customize menu / messages
+./hive run my-bot/                              # run the bot (+ dashboard)
+```
+
+---
+
+## Usage
+
+| Command | What it does |
+|---------|--------------|
+| `hive init <path> [--template <name>]` | Scaffold a new bot project (blank or from a template). |
+| `hive wizard <path>` | Interactive setup — pick a business type and answer a few questions. |
+| `hive templates` | List the available templates. |
+| `hive run <path> [--phone <number>]` | Start the bot (and the dashboard if enabled). Shows a QR to pair WhatsApp; `--phone` uses pair-code auth instead. |
+| `hive dashboard <path>` | Start only the admin dashboard (no WhatsApp), served at `http://localhost:<dashboard.port>` (default `8080`). |
+
+> Deploying your rApp to the testnet is a separate step done with Reality's tooling —
+> see [docs/DEPLOY.md](docs/DEPLOY.md). There is intentionally no `hive deploy` command.
+
+---
 
 ## Templates
 
-Hive includes **8 pre-built templates** for common businesses:
-
-- **food-delivery** — Restaurants, street food, home kitchens
-- **salon-booking** — Hair salons, barbers, spas
-- **event-tickets** — Concerts, workshops, classes
-- **tutoring** — Private lessons, test prep
-- **voucher-store** — Gift cards, loyalty programs
-- **community-store** — Co-ops, farmer's markets
-- **customer-support** — Help desk, ticket system
-- **real-estate** — Property listings, viewings
-
-**See all templates:**
-
 ```bash
 ./hive templates
+./hive init --template salon-booking my-salon
 ```
 
-**Use a template:**
+| Template | For |
+|----------|-----|
+| `food-delivery` | Restaurants, street food, home kitchens |
+| `salon-booking` | Hair salons, barbers, spas |
+| `event-tickets` | Concerts, workshops, classes |
+| `tutoring` | Private lessons, test prep |
+| `voucher-store` | Gift cards, loyalty programs |
+| `community-store` | Co-ops, farmer's markets |
+| `customer-support` | Help desk, ticketing |
+| `real-estate` | Property listings, viewings |
 
-```bash
-./hive init --template food-delivery my-restaurant
-```
+Localized variants also ship: `food-delivery-mpesa` (Kenya / M-Pesa) and
+`food-delivery-swahili`. Each template has pre-filled menu items, messages, and settings.
 
-Each template includes pre-filled menu items, messages, and settings — just customize and go.
+---
 
 ## Features
 
-- **Config-driven** — define your bot in YAML, no coding required
-- **Menu & ordering** — built-in support for product catalogs and order flows
-- **Vouchers** — create and redeem voucher codes
-- **M-Pesa payments** 🇰🇪 — STK Push, webhooks, admin notifications, reconciliation, B2C refunds ([guide](docs/MPESA_INTEGRATION.md) | [advanced](docs/MPESA_ADVANCED.md))
-- **Admin notifications** — owner gets order alerts via WhatsApp
-- **Web dashboard** — manage menu, orders, and analytics from a browser
-- **Decentralized hosting** — runs on Reality Network, powered by your community
-- **Single binary** — no Docker, no npm, no JVM. Just download and run.
+- **Config-driven** — define your bot in YAML, no coding required.
+- **Menu & ordering** — product catalogs, cart building, order lifecycle, admin alerts.
+- **Vouchers** — generate and redeem voucher codes.
+- **M-Pesa payments 🇰🇪** — STK Push + payment webhooks ([guide](docs/MPESA_INTEGRATION.md)).
+  _Note: B2C refunds are implemented in code but **not enabled in this release**._
+- **Local web dashboard** — orders, payments, stats, analytics, reconciliation, ledger export
+  (served on localhost).
+- **Reality rApp** — signed state-channel snapshots submitted to the Reality network.
+- **Single binary** — no Docker, no npm, no JVM to run the bot. Download and go.
 
-## Architecture
+---
 
-```
-Your Device (laptop/phone)
-├── WhatsApp Connection (whatsapp-rust)
-├── Bot Engine (message routing, conversation state)
-├── Plugin System (YAML config + handlers)
-├── Web Dashboard (local admin panel)
-├── SQLite (sessions, orders, menu)
-└── Reality Network Node (rApp integration)
-```
+## Deploy to the testnet
 
-## Reality Network Integration
+Each hive bot is its own rApp. To register yours and have its snapshots accepted:
 
-Hive automatically submits state snapshots to Reality Network's L0 layer as a **state channel**. Every order, voucher redemption, and status change is captured and submitted on-chain.
+1. Generate/own an rApp key with Reality's **keytool**.
+2. Publish (or reference) the hive binary and **post a `createDeployAppTransaction`** with the
+   Reality **wallet CLI** to `http://143.110.227.9:9000/transactions`.
+3. Point hive at the **same key** (`network.identity_key_hex`) so its snapshot signatures match
+   the deployed rApp address, and set `network.enabled: true`.
 
-### ✅ Integration Test Results (February 6, 2026)
+Full step-by-step (with the helper script `scripts/deploy.sh`):
+**[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
-**Test Cluster:**
-- 3-node L0 + 3-node L1 consensus cluster
-- Isolated test network (localhost:7000)
+---
 
-**Full End-to-End Flow:**
-```
-WhatsApp Message → Hive Bot → Order Created → State Changed
-→ Snapshot Captured → MessagePack Serialization → L0 Submission
-→ Accepted by Cluster → Ordinal Incremented
-```
+## Reality Network integration — how it works
 
-**Logs from Live Test:**
-```
-[2026-02-06T12:16:30Z INFO hive::bot] 📨 Message from 14152657184@s.whatsapp.net: 3
-[2026-02-06T12:16:30Z INFO hive::network::service] 📸 Capturing state: 1 orders, 0 delivered
-[2026-02-06T12:16:30Z INFO hive::network::client] Submitting state channel snapshot to http://localhost:7000/state-channels/NET4nFnmFxhdtG9kSR9LXxff35cgTHv6hW8pvzPx/snapshot
-[2026-02-06T12:16:30Z INFO hive::network::client] ✅ State channel snapshot accepted by L0
-[2026-02-06T12:16:30Z INFO hive::network::service] ✅ Snapshot submitted to Reality Network
+1. **Identity** — each instance uses an rApp key (generated locally, or set via
+   `network.identity_key_hex` to the key you deployed with).
+2. **State capture** — orders/vouchers/revenue are summarized (PII-free; orders are hashed).
+3. **Serialization** — the snapshot is encoded with MessagePack.
+4. **Signing** — signed with the instance's secp256k1 key.
+5. **Submission** — `POST {l0_url}/state-channels/{address}/snapshot`, with bounded retry and a
+   chain-head persisted across restarts.
+6. **Consensus** — once the rApp is deployed, the global L0 validates and includes the snapshot;
+   the global ordinal advances.
 
-[2026-02-06T12:16:51Z INFO hive::handlers::order] 📦 New order #2 from 14152657184@s.whatsapp.net — USD13.00
-[2026-02-06T12:16:51Z INFO hive::network::service] 📸 Capturing state: 2 orders, 0 delivered
-[2026-02-06T12:16:51Z INFO hive::network::client] ✅ State channel snapshot accepted by L0
-[2026-02-06T12:16:51Z INFO hive::network::service] ✅ Snapshot submitted to Reality Network
-```
+Technical detail: **[docs/REALITY_INTEGRATION.md](docs/REALITY_INTEGRATION.md)**.
 
-**Network Response:**
-- **3 snapshots submitted**
-- **All accepted by L0 consensus layer**
-- **Ordinal progression:** 12 → 30 (18 snapshots processed)
-- **Node identity:** `NET4nFnmFxhdtG9kSR9LXxff35cgTHv6hW8pvzPx`
-
-**Database Verification:**
-```bash
-$ sqlite3 data/hive.db "SELECT id, customer_phone, total, status FROM orders;"
-2|14152657184@s.whatsapp.net|13.0|confirmed
-1|+254700111222|27.0|pending
-```
-
-### How It Works
-
-1. **Identity Generation:** Hive creates a secp256k1 keypair on first run (`data/identity.json`)
-2. **State Capture:** Every message/order triggers snapshot generation
-3. **Serialization:** State is encoded using MessagePack
-4. **Signing:** Snapshot is cryptographically signed
-5. **Submission:** HTTP POST to L0 node `/state-channels/{address}/snapshot`
-6. **Consensus:** L0 cluster validates and incorporates into global snapshot
-7. **Finality:** Snapshot ordinal increments, state is on-chain
-
-**See:** [docs/REALITY_INTEGRATION.md](docs/REALITY_INTEGRATION.md) for technical details.
-
-## Documentation
-
-- **[For Builders (Non-Technical)](FOR_BUILDERS.md)** — Start here if you're new
-- **[Builder's Guide](docs/BUILDERS_GUIDE.md)** — Full walkthrough with examples, tips, FAQ
-- **[Video Tutorial](docs/VIDEO_SCRIPT.md)** — 5-minute screencast (production script)
-- **[Quickstart](docs/QUICKSTART.md)** — Minimal setup guide
-- **[Reality Network Integration](docs/REALITY_INTEGRATION.md)** — Technical deep-dive
-- **[Multi-Language Support](docs/MULTI_LANGUAGE.md)** — i18n configuration
+---
 
 ## Development
 
 ```bash
-# Build from source
-cargo build --release
-
-# Run tests
-cargo test
-
-# Build with Reality Network support (default)
-cargo build --release --features network
+cargo build --release     # build
+cargo test                # run tests
+cargo clippy --all-targets
 ```
 
-## Roadmap
+Run the Reality integration example against a node:
 
-### Phase 1: Launch (Q1 2026) ✅
-- [x] WhatsApp integration (QR pairing)
-- [x] Menu & ordering system
-- [x] Voucher system
-- [x] Web dashboard
-- [x] Multi-language support (7 languages)
-- [x] Reality Network integration
-- [x] MessagePack state serialization
-- [x] 8 business templates
-
-**Target:** 10,000 businesses in 6 months  
-**Focus:** Africa (Kenya, Nigeria, South Africa)  
-**Profile:** Solo entrepreneurs, <100 orders/day  
-**Value:** $0/month, 5-min setup, on-chain proof
-
-### Phase 2: SME Features (Q2-Q3 2026)
-- [ ] Enhanced analytics & reporting (export CSV, daily summaries)
-- [ ] SMS fallback (Twilio integration, pay-per-use)
-- [x] Payment gateway integrations (M-Pesa)
-- [x] M-Pesa support (Kenya) — STK Push integration
-- [ ] Backup/failover service (Reality nodes offer for $NET)
-- [ ] Voice message support
-- [ ] Delivery tracking integration
-- [ ] Multi-device dashboard improvements
-
-**Target:** Extend "works well" range to 500 orders/day  
-**When:** First 100 businesses hit scale constraints
-
-### Phase 3: Business API Bridge (Q4 2026+)
-- [ ] WhatsApp Business API support (premium tier)
-- [ ] Multi-agent routing (support teams)
-- [ ] Template messages (pre-approved broadcasts)
-- [ ] Queue management (ticket assignment)
-- [ ] Shift handoff (24/7 operations)
-- [ ] Enterprise analytics
-
-**Target:** SMEs doing $10k+/month revenue  
-**When:** 10+ customers request (and can afford $49/month tier)
-
-### Scaling Considerations
-
-**See [SCALING_ANALYSIS.md](SCALING_ANALYSIS.md)** for detailed breakdown of where current model works (70-80% of SMEs) and where Business API is needed (multi-agent teams, 24/7 operations).
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md)
-
-## License
-
-MIT — see [LICENSE](LICENSE)
-
-## Credits
-
-Built on top of:
-- [whatsapp-rust](https://github.com/openclaw/whatsapp-rust) — WhatsApp Web protocol
-- [Reality Network](https://realitynet.xyz) — Decentralized compute platform
-
-## Support
-
-- Discord: [discord.gg/realitynetwork](https://discord.gg/realitynetwork)
-- Twitter: [@RealityNetw0rk](https://twitter.com/RealityNetw0rk)
-- Issues: [GitHub Issues](https://github.com/kalkiboru111/hive/issues)
+```bash
+REALITY_URL=http://143.110.227.9:9000 cargo run --example test_reality
+```
 
 ---
 
-**Reality Network Ventures** — First portfolio proof-of-concept  
-**Target:** African entrepreneurs, zero cloud costs, 5-minute setup
+## Documentation
+
+- **[FOR_BUILDERS.md](FOR_BUILDERS.md)** — non-technical introduction.
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** — minimal setup.
+- **[docs/BUILDERS_GUIDE.md](docs/BUILDERS_GUIDE.md)** — full walkthrough, tips, FAQ.
+- **[docs/DEPLOY.md](docs/DEPLOY.md)** — deploy your rApp to the testnet.
+- **[docs/REALITY_INTEGRATION.md](docs/REALITY_INTEGRATION.md)** — snapshot architecture.
+- **[docs/MPESA_INTEGRATION.md](docs/MPESA_INTEGRATION.md)** — M-Pesa setup.
+- Internal design notes and historical test reports live in [docs/internal/](docs/internal/).
+
+---
+
+## Roadmap
+
+**Shipped (v0.2.0):** WhatsApp pairing (QR + pair-code), menu & ordering, vouchers, local
+dashboard, M-Pesa STK push + webhooks, Reality rApp snapshot submission, 8+ templates.
+
+**In progress / planned:**
+- Multi-language conversations — translation infrastructure exists (`src/i18n`) for 7 languages
+  but is **not yet wired into the bot's message flow**.
+- M-Pesa B2C refunds (code exists; needs config wiring + enabling).
+- Enhanced analytics/exports; SMS fallback; delivery tracking.
+- WhatsApp Business API tier for multi-agent / 24-7 teams.
+
+See **[docs/internal/SCALING_ANALYSIS.md](docs/internal/SCALING_ANALYSIS.md)** for where the
+current single-operator model fits and where it doesn't.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome — please open an issue describing the change first.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Credits
+
+- [whatsapp-rust](https://github.com/jlucaso1/whatsapp-rust) — WhatsApp Web protocol.
+- [Reality Network](https://github.com/reality-foundation) — decentralized compute platform.
+
+## Support
+
+- Issues: [github.com/kalkiboru111/hive/issues](https://github.com/kalkiboru111/hive/issues)

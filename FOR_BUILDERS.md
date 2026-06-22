@@ -56,7 +56,7 @@ chmod +x hive
 ## 📚 Full Documentation
 
 - **[Builder's Guide](docs/BUILDERS_GUIDE.md)** — Complete walkthrough with screenshots, tips, FAQ
-- **[Video Tutorial](docs/VIDEO_SCRIPT.md)** — 5-minute screencast showing the full setup *(video TBD)*
+- **[Deploy to the testnet](docs/DEPLOY.md)** — register your bot as a rApp on Reality
 - **[Templates](#-templates)** — Pre-built configs for 8 common business types
 
 ---
@@ -172,14 +172,6 @@ menu:
 
 ---
 
-## 🎥 Watch the Video
-
-**[Hive in 5 Minutes — Full Walkthrough]** *(video coming soon)*
-
-Watch a real setup from download to first order.
-
----
-
 ## 💡 Tips for Success
 
 ### 1. Start with a Template
@@ -208,8 +200,6 @@ Use an old phone or laptop so your main machine doesn't need to stay on 24/7.
 **Stuck? Have questions? Want to show off your bot?**
 
 - **GitHub Issues:** [kalkiboru111/hive/issues](https://github.com/kalkiboru111/hive/issues)
-- **WhatsApp Group:** [Hive Builders Community] *(link TBD)*
-- **Email:** support@realitynet.xyz
 
 ---
 
@@ -233,35 +223,26 @@ Use an old phone or laptop so your main machine doesn't need to stay on 24/7.
 
 Once you're live and running:
 
-### 🔗 Publish to Reality Network
+### 🔗 Deploy to the Reality testnet
 
-```bash
-./hive publish
-```
-
-**What this does:**
-- Deploys your bot as a **Reality Network rApp**
-- Anyone can run a copy (franchise model)
-- You earn fees on every transaction
-- Zero infrastructure costs (Reality Network is community-powered)
-
-*(Publishing feature coming Q2 2026)*
+Each Hive bot is its own **rApp**. Register yours on the Reality testnet so its activity is
+recorded on-chain. This is done with Reality's keytool + wallet tooling — there is no
+`hive publish` command. Full steps: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
 ---
 
 ### 💰 Accept Payments
 
-Integrate M-Pesa, UPI, crypto, or local payment rails. Customers pay in-chat, orders auto-confirm.
-
-*(Payment plugins coming Q2 2026)*
+**M-Pesa (Kenya) works today** — STK Push + payment webhooks. Customers pay in-chat and orders
+auto-confirm. See **[docs/MPESA_INTEGRATION.md](docs/MPESA_INTEGRATION.md)**.
+*(B2C refunds exist in code but aren't enabled in this release.)*
 
 ---
 
 ### 🌐 Multi-Language
 
-Serve customers in multiple languages. Auto-detect, translate menu, respond in their language.
-
-*(Multi-language guide coming soon)*
+Translation infrastructure for 7 languages is built in (`src/i18n`), but isn't yet wired into
+the live conversation flow — coming in a future release.
 
 ---
 
@@ -274,6 +255,6 @@ Download Hive. Pick a template. Edit the config. Run it. Scan the QR. Your bot i
 ---
 
 **Questions? Feedback? Built something cool?**  
-👉 [Open an issue](https://github.com/kalkiboru111/hive/issues) or join the [WhatsApp group] *(link TBD)*
+👉 [Open an issue](https://github.com/kalkiboru111/hive/issues)
 
 🐝 **Hive — Your device. Your bot. Your business.**

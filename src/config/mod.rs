@@ -148,6 +148,28 @@ pub struct DashboardConfig {
     pub port: u16,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Interface to bind. Defaults to loopback (`127.0.0.1`) so the admin panel
+    /// is NOT exposed to the network. Set to `0.0.0.0` to expose it — only do
+    /// that together with `auth_token` (and ideally a TLS reverse proxy).
+    #[serde(default = "default_bind_host")]
+    pub bind_host: String,
+    /// Optional shared secret. When set, the admin routes require HTTP Basic
+    /// auth (any username, password = this token). The M-Pesa webhook callbacks
+    /// stay public so the payment provider can reach them.
+    #[serde(default)]
+    pub auth_token: Option<String>,
+}
+
+impl DashboardConfig {
+    /// The effective auth token, treating an empty/whitespace value as "no auth
+    /// configured". This prevents an empty `auth_token` from enabling the auth
+    /// layer while accepting an empty password (a silent bypass).
+    pub fn effective_auth_token(&self) -> Option<&str> {
+        self.auth_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+    }
 }
 
 impl Default for DashboardConfig {
@@ -155,6 +177,8 @@ impl Default for DashboardConfig {
         Self {
             port: default_port(),
             enabled: true,
+            bind_host: default_bind_host(),
+            auth_token: None,
         }
     }
 }
@@ -163,25 +187,37 @@ fn default_port() -> u16 {
     8080
 }
 
+fn default_bind_host() -> String {
+    "127.0.0.1".to_string()
+}
+
 /// Reality Network integration configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
     /// Whether to submit state snapshots to Reality Network.
     #[serde(default)]
     pub enabled: bool,
-    /// L0 node URL (e.g., "http://localhost:7000").
+    /// Reality testnet L0 node URL.
     #[serde(default = "default_l0_url")]
     pub l0_url: String,
     /// Path to the node identity file (generated on first run).
     #[serde(default = "default_identity_path")]
     pub identity_path: String,
+    /// Optional hex-encoded secret key for this rApp's identity.
+    ///
+    /// Set this to the key you deployed the rApp with (from Reality
+    /// `keytool export`) so the deploy address and the snapshot-signing key
+    /// match — see docs/DEPLOY.md. If unset, hive generates/loads a key at
+    /// `identity_path`.
+    #[serde(default)]
+    pub identity_key_hex: Option<String>,
     /// Minimum seconds between snapshot submissions (rate limiting).
     #[serde(default = "default_snapshot_interval")]
     pub snapshot_interval_secs: u64,
 }
 
 fn default_l0_url() -> String {
-    "http://localhost:9000".to_string()
+    "http://143.110.227.9:9000".to_string()
 }
 
 fn default_identity_path() -> String {
@@ -198,6 +234,7 @@ impl Default for NetworkConfig {
             enabled: false,
             l0_url: default_l0_url(),
             identity_path: default_identity_path(),
+            identity_key_hex: None,
             snapshot_interval_secs: default_snapshot_interval(),
         }
     }

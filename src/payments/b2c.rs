@@ -3,7 +3,7 @@
 //! Allows businesses to send money to customers (e.g., refunds, rewards)
 
 use anyhow::{Result, Context, bail};
-use log::{info, warn};
+use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -66,6 +66,7 @@ struct B2CRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // mirrors the full M-Pesa B2C API response; not every field is read
 struct B2CResponse {
     #[serde(rename = "ConversationID")]
     conversation_id: Option<String>,

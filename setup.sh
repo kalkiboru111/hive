@@ -4,9 +4,8 @@
 
 set -e
 
-# Testnet endpoints - update these with your testnet's public address
-TESTNET_L0="${HIVE_TESTNET_L0:-http://100.123.52.97:9100}"
-TESTNET_L1="${HIVE_TESTNET_L1:-http://100.123.52.97:9110}"
+# Reality testnet L0 node (override with HIVE_TESTNET_L0 to use your own node).
+TESTNET_L0="${HIVE_TESTNET_L0:-http://143.110.227.9:9000}"
 RELEASES_URL="https://github.com/kalkiboru111/hive/releases/latest/download"
 
 echo "🐝 Hive rApp Setup"
@@ -122,11 +121,15 @@ delivery:
 admin_numbers:
   - "$ADMIN_NUMBER"
 
-# Reality Network connection
+# Reality Network connection.
+# Each Hive bot is its own rApp. Before snapshots are accepted you must deploy
+# your rApp on the testnet and set identity_key_hex to that key — see
+# https://github.com/kalkiboru111/hive/blob/main/docs/DEPLOY.md
 network:
-  enabled: true
+  enabled: false
   l0_url: "$TESTNET_L0"
   identity_path: "data/identity.json"
+  # identity_key_hex: "<your keytool-exported rApp key>"
   snapshot_interval_secs: 30
 
 dashboard:
@@ -161,9 +164,7 @@ echo "3. Scan the QR code with WhatsApp to pair"
 echo ""
 echo "4. Test by sending a message to your WhatsApp number"
 echo ""
-echo "Testnet endpoints:"
-echo "  L0: $TESTNET_L0"
-echo "  L1: $TESTNET_L1"
+echo "Testnet L0 node: $TESTNET_L0"
 echo ""
 echo "Dashboard: http://localhost:8080 (when running)"
 echo ""

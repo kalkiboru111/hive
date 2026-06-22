@@ -34,9 +34,10 @@ menu:
 admin_numbers:
   - "+YOUR_NUMBER_HERE"
 
+# Reality is off until you deploy your rApp — see docs/DEPLOY.md, then set enabled: true
 network:
-  enabled: true
-  l0_url: "http://100.123.52.97:9100"
+  enabled: false
+  l0_url: "http://143.110.227.9:9000"
 EOF
 
 # 4. Run
@@ -52,7 +53,7 @@ EOF
 - [ ] Admin receives notification
 - [ ] "DONE 1" marks order complete
 - [ ] Dashboard shows at localhost:8080
-- [ ] Logs show "Snapshot submitted to Reality Network"
+- [ ] (After deploying your rApp — see docs/DEPLOY.md) logs show "Snapshot submitted to Reality Network"
 
 ## Report Issues
 

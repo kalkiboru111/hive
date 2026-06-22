@@ -10,10 +10,10 @@ pub mod mpesa;
 pub mod types;
 pub mod webhook;
 
-pub use b2c::{B2CClient, B2CConfig, B2CTransactionType};
+pub use b2c::B2CClient;
 pub use mpesa::MpesaClient;
 pub use types::{Payment, PaymentMethod, PaymentStatus};
-pub use webhook::{MpesaCallback, PaymentCallbackResult, process_callback};
+pub use webhook::{MpesaCallback, process_callback};
 
 use anyhow::Result;
 
