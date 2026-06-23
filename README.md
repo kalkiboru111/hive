@@ -61,9 +61,13 @@ cargo build --release
 **👉 [FOR_BUILDERS.md](FOR_BUILDERS.md)** walks through everything. The fast path:
 
 ```bash
-./hive wizard my-business     # answer a few questions, config is generated
-./hive run my-business/       # scan the QR with WhatsApp — bot is live
+./hive init my-business     # create a project
+./hive run my-business      # opens the setup dashboard in your browser
 ```
+
+The dashboard then guides you through a short **onboarding wizard** — enter your business
+details, **pair WhatsApp by scanning a QR right in the browser** (or via a phone pair-code), and
+add your menu. No config files to edit, no terminal QR.
 
 ### Developers
 
@@ -82,8 +86,8 @@ nano my-bot/config.yaml                         # customize menu / messages
 | `hive init <path> [--template <name>]` | Scaffold a new bot project (blank or from a template). |
 | `hive wizard <path>` | Interactive setup — pick a business type and answer a few questions. |
 | `hive templates` | List the available templates. |
-| `hive run <path> [--phone <number>]` | Start the bot (and the dashboard if enabled). Shows a QR to pair WhatsApp; `--phone` uses pair-code auth instead. |
-| `hive dashboard <path>` | Start only the admin dashboard (no WhatsApp), served at `http://localhost:<dashboard.port>` (default `8080`). |
+| `hive run <path> [--phone <number>]` | Start the bot **and the dashboard**. On a new project the dashboard opens an **onboarding wizard** (business setup → in-browser WhatsApp pairing → menu). `--phone` is an optional CLI pair-code alternative. |
+| `hive dashboard <path>` | Start only the admin dashboard (no WhatsApp connection), served at `http://localhost:<dashboard.port>` (default `8080`). |
 
 > Deploying your rApp to the testnet is a separate step done with Reality's tooling —
 > see [docs/DEPLOY.md](docs/DEPLOY.md). There is intentionally no `hive deploy` command.
@@ -109,20 +113,28 @@ nano my-bot/config.yaml                         # customize menu / messages
 | `real-estate` | Property listings, viewings |
 
 Localized variants also ship: `food-delivery-mpesa` (Kenya / M-Pesa) and
-`food-delivery-swahili`. Each template has pre-filled menu items, messages, and settings.
+`food-delivery-swahili`. The blank **default** project starts with an *empty* menu — you build
+it in the dashboard during onboarding; the vertical templates above include sample menus you can
+use as a starting point.
 
 ---
 
 ## Features
 
-- **Config-driven** — define your bot in YAML, no coding required.
-- **Menu & ordering** — product catalogs, cart building, order lifecycle, admin alerts.
+- **Dashboard-driven onboarding** — `hive run` opens a browser wizard: set your business
+  details, **pair WhatsApp via an in-browser QR** (or a phone pair-code), and build your menu —
+  no config-file editing.
+- **Menu & ordering** — product catalogs, cart building, order lifecycle, admin alerts; edit your
+  menu and business details live from the dashboard (persisted to `config.yaml`).
 - **Vouchers** — generate and redeem voucher codes.
 - **M-Pesa payments 🇰🇪** — STK Push + payment webhooks ([guide](docs/MPESA_INTEGRATION.md)).
-  _Note: B2C refunds are implemented in code but **not enabled in this release**._
-- **Local web dashboard** — orders, payments, stats, analytics, reconciliation, ledger export
-  (served on localhost).
-- **Reality rApp** — signed state-channel snapshots submitted to the Reality network.
+  _(B2C refunds exist in code but are not enabled in this release.)_
+- **Transaction history export** — download your full financial ledger (orders, payments,
+  refunds, totals) from the dashboard's Payments tab — handy for bookkeeping or credit applications.
+- **Payments insights** — payment analytics and an automated reconciliation report.
+- **Local web dashboard** — orders, menu, vouchers, payments/export, and settings; binds to
+  `127.0.0.1` by default, with optional Basic-auth (`dashboard.auth_token`) for remote access.
+- **Reality rApp** — signed state-channel snapshots submitted to the Reality testnet.
 - **Single binary** — no Docker, no npm, no JVM to run the bot. Download and go.
 
 ---

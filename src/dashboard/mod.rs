@@ -10,7 +10,8 @@
 //! - POST /api/vouchers     — create a new voucher
 //! - GET  /api/stats        — aggregate statistics
 
-use crate::config::HiveConfig;
+use crate::bot::{PairingPhase, SharedConfig, SharedPairing, WaControl, WaControlTx};
+use crate::config::MenuItem;
 use crate::payments::{B2CClient, MpesaCallback, process_callback};
 use crate::store::{OrderStatus, Store};
 use anyhow::Result;
@@ -20,19 +21,27 @@ use axum::{
     http::{StatusCode, header},
     middleware::{self, Next},
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 /// Shared state for Axum handlers.
 #[derive(Clone)]
 struct AppState {
-    config: Arc<HiveConfig>,
+    /// Live, swappable config — read via `.load()`, mutate via clone+save+store.
+    config: SharedConfig,
     store: Store,
     wa_client: Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>,
+    /// Live WhatsApp pairing/connection state (written by the bot).
+    wa_pairing: SharedPairing,
+    /// Project dir, so config edits can be persisted to config.yaml.
+    project_dir: PathBuf,
+    /// Drives runtime pairing/logout on the bot's connection loop.
+    wa_control: WaControlTx,
     b2c_client: Option<Arc<B2CClient>>,
 }
 
@@ -41,9 +50,12 @@ const DASHBOARD_HTML: &str = include_str!("../../static/dashboard.html");
 
 /// Start the dashboard web server.
 pub async fn run_dashboard(
-    config: HiveConfig,
+    config: SharedConfig,
     store: Store,
     wa_client: Arc<tokio::sync::RwLock<Option<Arc<whatsapp_rust::client::Client>>>>,
+    wa_pairing: SharedPairing,
+    project_dir: PathBuf,
+    wa_control: WaControlTx,
 ) -> Result<()> {
     // B2C (refunds/payouts) is out of scope for this release: the client code
     // exists (src/payments/b2c.rs) but separate B2C credentials are not yet
@@ -51,9 +63,12 @@ pub async fn run_dashboard(
     let b2c_client: Option<Arc<B2CClient>> = None;
 
     let state = AppState {
-        config: Arc::new(config.clone()),
+        config: config.clone(),
         store,
         wa_client,
+        wa_pairing,
+        project_dir,
+        wa_control,
         b2c_client,
     };
 
@@ -68,11 +83,18 @@ pub async fn run_dashboard(
     // payments, or mutations. Protected by Basic auth when auth_token is set.
     let mut admin = Router::new()
         .route("/", get(serve_dashboard))
+        .route("/api/config", get(get_config))
+        .route("/api/config/business", post(post_config_business))
         .route("/api/orders", get(list_orders))
         .route("/api/orders/{id}", get(get_order))
-        .route("/api/menu", get(get_menu))
+        .route("/api/menu", get(get_menu).post(post_menu))
+        .route("/api/menu/{id}", put(put_menu).delete(delete_menu))
         .route("/api/vouchers", get(list_vouchers).post(create_voucher))
         .route("/api/stats", get(get_stats))
+        .route("/api/wa/status", get(wa_status))
+        .route("/api/wa/qr.png", get(wa_qr_png))
+        .route("/api/wa/pair", post(wa_pair))
+        .route("/api/wa/logout", post(wa_logout))
         .route("/api/payments", get(list_payments))
         .route("/api/payments/{id}", get(get_payment))
         .route("/api/payments/{id}/refund", post(refund_payment))
@@ -82,7 +104,8 @@ pub async fn run_dashboard(
         .route("/api/analytics/payments", get(payment_analytics))
         .route("/api/reconciliation/report", get(reconciliation_report));
 
-    if config.dashboard.effective_auth_token().is_some() {
+    let cfg = config.load_full();
+    if cfg.dashboard.effective_auth_token().is_some() {
         admin = admin.route_layer(middleware::from_fn_with_state(state.clone(), require_basic_auth));
     }
 
@@ -91,10 +114,10 @@ pub async fn run_dashboard(
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let bind_host = config.dashboard.bind_host.clone();
-    let port = config.dashboard.port;
+    let bind_host = cfg.dashboard.bind_host.clone();
+    let port = cfg.dashboard.port;
     let is_loopback = matches!(bind_host.as_str(), "127.0.0.1" | "localhost" | "::1");
-    if !is_loopback && config.dashboard.effective_auth_token().is_none() {
+    if !is_loopback && cfg.dashboard.effective_auth_token().is_none() {
         log::warn!(
             "⚠️  Dashboard is bound to {} (network-exposed) with NO auth_token set. \
              Anyone who can reach port {} can read orders/PII and create vouchers. \
@@ -117,7 +140,8 @@ pub async fn run_dashboard(
 /// Accepts any username; the password must equal the configured token. Returns
 /// 401 with a `WWW-Authenticate` challenge so browsers prompt for credentials.
 async fn require_basic_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
-    let Some(expected) = state.config.dashboard.effective_auth_token() else {
+    let cfg = state.config.load_full();
+    let Some(expected) = cfg.dashboard.effective_auth_token() else {
         return next.run(req).await;
     };
 
@@ -212,8 +236,298 @@ async fn get_order(
     }
 }
 
+// ─── Onboarding / config / menu editing ─────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct BusinessUpdate {
+    name: Option<String>,
+    currency: Option<String>,
+    welcome: Option<String>,
+    about: Option<String>,
+    admin_number: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MenuItemInput {
+    name: Option<String>,
+    price: Option<f64>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    emoji: Option<String>,
+    #[serde(default)]
+    available: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PairRequest {
+    method: String,
+    /// Reserved for the phone-code pairing flow (not yet wired at runtime).
+    #[serde(default)]
+    #[allow(dead_code)]
+    phone: Option<String>,
+}
+
+fn menu_json(menu: &[MenuItem]) -> serde_json::Value {
+    serde_json::Value::Array(
+        menu.iter()
+            .enumerate()
+            .map(|(id, m)| {
+                serde_json::json!({
+                    "id": id,
+                    "name": m.name,
+                    "price": m.price,
+                    "description": m.description,
+                    "emoji": m.emoji,
+                    "available": m.available,
+                })
+            })
+            .collect(),
+    )
+}
+
+fn save_err(e: impl std::fmt::Display) -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ApiError { error: format!("Failed to save config: {}", e) }),
+    )
+        .into_response()
+}
+
+/// Overall setup/config snapshot for the dashboard (drives onboarding vs main).
+async fn get_config(State(state): State<AppState>) -> impl IntoResponse {
+    let cfg = state.config.load_full();
+    Json(serde_json::json!({
+        "business": {
+            "name": cfg.business.name,
+            "currency": cfg.business.currency,
+            "welcome": cfg.business.welcome,
+            "about": cfg.business.about,
+        },
+        "admin_numbers": cfg.admin_numbers,
+        "delivery": cfg.delivery,
+        "menu_count": cfg.menu.len(),
+        "setup_complete": cfg.setup_complete(),
+    }))
+}
+
+/// Update business fields (onboarding step 1 + Settings).
+async fn post_config_business(
+    State(state): State<AppState>,
+    Json(req): Json<BusinessUpdate>,
+) -> Response {
+    let mut cfg = (*state.config.load_full()).clone();
+    if let Some(v) = req.name {
+        cfg.business.name = v;
+    }
+    if let Some(v) = req.currency.filter(|v| !v.trim().is_empty()) {
+        cfg.business.currency = v;
+    }
+    if let Some(v) = req.welcome {
+        cfg.business.welcome = v;
+    }
+    if let Some(v) = req.about {
+        cfg.business.about = if v.trim().is_empty() { None } else { Some(v) };
+    }
+    if let Some(num) = req.admin_number.filter(|n| !n.trim().is_empty()) {
+        cfg.admin_numbers = vec![num];
+    }
+    if let Err(e) = cfg.save(&state.project_dir) {
+        return save_err(e);
+    }
+    state.config.store(Arc::new(cfg));
+    (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response()
+}
+
 async fn get_menu(State(state): State<AppState>) -> impl IntoResponse {
-    Json(serde_json::to_value(&state.config.menu).unwrap())
+    let cfg = state.config.load_full();
+    Json(menu_json(&cfg.menu))
+}
+
+/// Append a new menu item.
+async fn post_menu(State(state): State<AppState>, Json(req): Json<MenuItemInput>) -> Response {
+    let name = req.name.unwrap_or_default();
+    if name.trim().is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(ApiError { error: "name is required".into() })).into_response();
+    }
+    let price = req.price.unwrap_or(0.0);
+    if price < 0.0 {
+        return (StatusCode::BAD_REQUEST, Json(ApiError { error: "price cannot be negative".into() })).into_response();
+    }
+    let mut cfg = (*state.config.load_full()).clone();
+    cfg.menu.push(MenuItem {
+        name,
+        price,
+        description: req.description.filter(|s| !s.trim().is_empty()),
+        emoji: req.emoji.filter(|s| !s.trim().is_empty()),
+        available: req.available.unwrap_or(true),
+    });
+    let new_id = cfg.menu.len() - 1;
+    if let Err(e) = cfg.save(&state.project_dir) {
+        return save_err(e);
+    }
+    state.config.store(Arc::new(cfg));
+    (StatusCode::OK, Json(serde_json::json!({ "id": new_id }))).into_response()
+}
+
+/// Update an existing menu item by index (partial fields allowed).
+async fn put_menu(
+    State(state): State<AppState>,
+    Path(id): Path<usize>,
+    Json(req): Json<MenuItemInput>,
+) -> Response {
+    let mut cfg = (*state.config.load_full()).clone();
+    let Some(item) = cfg.menu.get_mut(id) else {
+        return (StatusCode::NOT_FOUND, Json(ApiError { error: format!("menu item {} not found", id) })).into_response();
+    };
+    if let Some(v) = req.name.filter(|v| !v.trim().is_empty()) {
+        item.name = v;
+    }
+    if let Some(v) = req.price.filter(|p| *p >= 0.0) {
+        item.price = v;
+    }
+    if let Some(v) = req.description {
+        item.description = if v.trim().is_empty() { None } else { Some(v) };
+    }
+    if let Some(v) = req.emoji {
+        item.emoji = if v.trim().is_empty() { None } else { Some(v) };
+    }
+    if let Some(v) = req.available {
+        item.available = v;
+    }
+    if let Err(e) = cfg.save(&state.project_dir) {
+        return save_err(e);
+    }
+    state.config.store(Arc::new(cfg));
+    (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response()
+}
+
+/// Delete a menu item by index.
+async fn delete_menu(State(state): State<AppState>, Path(id): Path<usize>) -> Response {
+    let mut cfg = (*state.config.load_full()).clone();
+    if id >= cfg.menu.len() {
+        return (StatusCode::NOT_FOUND, Json(ApiError { error: format!("menu item {} not found", id) })).into_response();
+    }
+    cfg.menu.remove(id);
+    if let Err(e) = cfg.save(&state.project_dir) {
+        return save_err(e);
+    }
+    state.config.store(Arc::new(cfg));
+    (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response()
+}
+
+// ─── WhatsApp pairing (onboarding step 2) ────────────────────────
+
+/// Live pairing/connection status for the onboarding UI.
+async fn wa_status(State(state): State<AppState>) -> impl IntoResponse {
+    let p = state.wa_pairing.read().await.clone();
+    let client_connected = state.wa_client.read().await.is_some();
+    let connected = p.connected || client_connected;
+    let state_str = if connected {
+        "connected"
+    } else {
+        match p.state {
+            PairingPhase::WaitingQr => "waiting_qr",
+            PairingPhase::WaitingCode => "waiting_code",
+            PairingPhase::Connected => "connected",
+            PairingPhase::Disconnected => "disconnected",
+        }
+    };
+    Json(serde_json::json!({
+        "state": state_str,
+        "connected": connected,
+        "has_qr": p.qr_code.is_some() && !connected,
+        "pairing_code": if connected { None } else { p.pairing_code },
+        "expires_at": p.expires_at,
+    }))
+}
+
+/// Render the current pairing QR as a PNG for the browser.
+async fn wa_qr_png(State(state): State<AppState>) -> Response {
+    let code = {
+        let p = state.wa_pairing.read().await;
+        p.qr_code.clone()
+    };
+    let Some(code) = code else {
+        return (StatusCode::NOT_FOUND, "no QR available").into_response();
+    };
+    let qr = match qrcode::QrCode::new(code.as_bytes()) {
+        Ok(q) => q,
+        Err(e) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, format!("QR error: {}", e)).into_response();
+        }
+    };
+    let img = qr
+        .render::<image::Luma<u8>>()
+        .quiet_zone(true)
+        .min_dimensions(480, 480)
+        .build();
+    let mut cursor = std::io::Cursor::new(Vec::<u8>::new());
+    if let Err(e) = image::DynamicImage::ImageLuma8(img).write_to(&mut cursor, image::ImageFormat::Png) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, format!("encode error: {}", e)).into_response();
+    }
+    (
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        cursor.into_inner(),
+    )
+        .into_response()
+}
+
+/// Switch pairing method. Both flows signal the bot's restartable connection over
+/// the control channel: "qr" resets to QR mode; "phone" reconnects in pair-code
+/// mode for the given number (the resulting code surfaces via GET /api/wa/status).
+/// Returns 503 if the bot connection isn't running (e.g. `hive dashboard` mode).
+async fn wa_pair(State(state): State<AppState>, Json(req): Json<PairRequest>) -> Response {
+    match req.method.as_str() {
+        "qr" => {
+            let _ = state.wa_control.send(WaControl::ResetToQr);
+            (StatusCode::OK, Json(serde_json::json!({ "ok": true, "method": "qr" }))).into_response()
+        }
+        "phone" => {
+            let phone = req.phone.unwrap_or_default();
+            let phone = phone.trim();
+            if phone.is_empty() {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(ApiError { error: "a phone number is required for phone-code pairing".into() }),
+                )
+                    .into_response();
+            }
+            match state.wa_control.send(WaControl::PairWithPhone(phone.to_string())) {
+                Ok(()) => (
+                    StatusCode::OK,
+                    Json(serde_json::json!({ "ok": true, "method": "phone" })),
+                )
+                    .into_response(),
+                Err(_) => (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(ApiError { error: "the bot connection is not running".into() }),
+                )
+                    .into_response(),
+            }
+        }
+        other => (
+            StatusCode::BAD_REQUEST,
+            Json(ApiError { error: format!("unknown pairing method '{}'", other) }),
+        )
+            .into_response(),
+    }
+}
+
+/// Logout/unlink WhatsApp: disconnect and clear the saved session so the next
+/// connection requires a fresh pairing.
+async fn wa_logout(State(state): State<AppState>) -> Response {
+    match state.wa_control.send(WaControl::Logout) {
+        Ok(()) => (StatusCode::OK, Json(serde_json::json!({ "ok": true }))).into_response(),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiError { error: "the bot connection is not running".into() }),
+        )
+            .into_response(),
+    }
 }
 
 async fn list_vouchers(State(state): State<AppState>) -> impl IntoResponse {
@@ -292,7 +606,8 @@ async fn mpesa_callback(
         client_lock.clone()
     };
     
-    match process_callback(callback, &state.store, &state.config, wa_client).await {
+    let cfg = state.config.load_full();
+    match process_callback(callback, &state.store, &cfg, wa_client).await {
         Ok(result) => {
             log::info!("✅ {}", result.message);
             (StatusCode::OK, Json(serde_json::json!({
@@ -363,6 +678,7 @@ async fn refund_payment(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    let cfg = state.config.load_full();
     // Check if B2C is configured
     let b2c = match state.b2c_client.as_ref() {
         Some(client) => client,
@@ -435,9 +751,9 @@ async fn refund_payment(
                 "success": true,
                 "refund_id": refund_id,
                 "conversation_id": conversation_id,
-                "message": format!("Refund of {}{} initiated to {}", 
-                                  state.config.business.currency, 
-                                  payment.amount, 
+                "message": format!("Refund of {}{} initiated to {}",
+                                  cfg.business.currency,
+                                  payment.amount,
                                   payment.phone)
             }))).into_response()
         }
@@ -545,6 +861,7 @@ async fn mpesa_b2c_callback(
 /// Export full ledger for bank credit applications
 async fn export_ledger(State(state): State<AppState>) -> impl IntoResponse {
     log::info!("📊 Generating ledger export for credit application");
+    let cfg = state.config.load_full();
     
     // Gather all financial data
     let orders = match state.store.list_orders(None) {
@@ -635,9 +952,9 @@ async fn export_ledger(State(state): State<AppState>) -> impl IntoResponse {
     let report = serde_json::json!({
         "generated_at": chrono::Utc::now().to_rfc3339(),
         "business": {
-            "name": state.config.business.name,
-            "currency": state.config.business.currency,
-            "phone": state.config.business.phone,
+            "name": cfg.business.name,
+            "currency": cfg.business.currency,
+            "phone": cfg.business.phone,
         },
         "summary": {
             "total_revenue": stats.total_revenue,
@@ -714,7 +1031,7 @@ async fn export_ledger(State(state): State<AppState>) -> impl IntoResponse {
         ("Content-Type", "application/json"),
         ("Content-Disposition", &format!(
             "attachment; filename=\"{}-ledger-{}.json\"",
-            state.config.business.name.replace(" ", "-").to_lowercase(),
+            cfg.business.name.replace(" ", "-").to_lowercase(),
             chrono::Utc::now().format("%Y%m%d")
         )),
     ];
@@ -724,6 +1041,7 @@ async fn export_ledger(State(state): State<AppState>) -> impl IntoResponse {
 
 /// Payment analytics with trends and insights
 async fn payment_analytics(State(state): State<AppState>) -> impl IntoResponse {
+    let cfg = state.config.load_full();
     let orders = match state.store.list_orders(None) {
         Ok(o) => o,
         Err(e) => {
@@ -802,7 +1120,7 @@ async fn payment_analytics(State(state): State<AppState>) -> impl IntoResponse {
             },
         },
         "insights": {
-            "avg_order_value": format!("{}{:.2}", state.config.business.currency, avg_order_value),
+            "avg_order_value": format!("{}{:.2}", cfg.business.currency, avg_order_value),
             "peak_hours": peak_hours,
             "total_transactions": all_payments.len(),
             "successful_transactions": completed_payments.len(),

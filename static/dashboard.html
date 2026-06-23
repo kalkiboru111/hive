@@ -1,475 +1,534 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hive Dashboard</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
-            color: #2c3e50;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        header {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            font-size: 2em;
-            color: #FF8C00;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card h3 {
-            font-size: 0.9em;
-            color: #7f8c8d;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .stat-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #FF8C00;
-        }
-        
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .tab {
-            background: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1em;
-            transition: all 0.3s;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        .tab.active {
-            background: #FF8C00;
-            color: white;
-            box-shadow: 0 4px 12px rgba(255,140,0,0.3);
-        }
-        
-        .tab:hover:not(.active) {
-            background: #f8f9fa;
-        }
-        
-        .panel {
-            display: none;
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        .panel.active {
-            display: block;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ecf0f1;
-        }
-        
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #7f8c8d;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 0.5px;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: 600;
-        }
-        
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-confirmed { background: #d1ecf1; color: #0c5460; }
-        .status-delivered { background: #d4edda; color: #155724; }
-        .status-cancelled { background: #f8d7da; color: #721c24; }
-        
-        .menu-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #ecf0f1;
-        }
-        
-        .menu-item:last-child { border-bottom: none; }
-        
-        .menu-item-name {
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .menu-item-emoji { font-size: 1.5em; }
-        
-        .menu-item-price {
-            font-weight: bold;
-            color: #FF8C00;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #7f8c8d;
-        }
-        
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 1em;
-        }
-        
-        button {
-            background: #FF8C00;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        
-        button:hover {
-            background: #FF7F00;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255,140,0,0.3);
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #95a5a6;
-        }
-        
-        .empty-state-icon {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #95a5a6;
-        }
-        
-        .voucher-code {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            color: #FF8C00;
-            background: #fff3e0;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --cream:#FBF3E4; --cream-2:#F6E8D0;
+    --surface:#FFFFFF; --surface-tint:#FFFCF6;
+    --ink:#3A2A1A; --ink-soft:#7A6A55; --ink-faint:#A99A85;
+    --honey:#E08A0B; --honey-deep:#C2700A; --honey-soft:#FBE6C0;
+    --line:#E8DCC6;
+    --green:#2E9E5B; --green-soft:#DDF3E5;
+    --amber:#E0A21A; --amber-soft:#FBEFCF;
+    --red:#CF5638; --red-soft:#F8E2DB;
+    --blue-soft:#DCEBF3;
+    --shadow:0 10px 30px -12px rgba(120,82,20,.28);
+    --shadow-sm:0 4px 14px -6px rgba(120,82,20,.22);
+    --radius:20px; --radius-sm:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:'Nunito',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(900px 500px at 12% -10%, #FFF6E6 0%, transparent 60%),
+      radial-gradient(700px 500px at 110% 0%, #FBEAD0 0%, transparent 55%),
+      var(--cream);
+    min-height:100%;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* subtle honeycomb texture */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'%3E%3Cg fill='none' stroke='%23E9D9BC' stroke-width='1'%3E%3Cpath d='M28 0 L56 16 L56 50 L28 66 L0 50 L0 16 Z'/%3E%3Cpath d='M28 34 L56 50 L56 84 L28 100 L0 84 L0 50 Z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:28px 22px 64px}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+
+  /* ---------- brand header ---------- */
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+  .logo{width:46px;height:46px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(150deg,#FFD37A,#E08A0B);border-radius:14px;
+    box-shadow:0 6px 16px -6px rgba(224,138,11,.7);transform:rotate(-4deg)}
+  .brand h1{font-size:26px;line-height:1}
+  .brand .sub{font-size:13px;color:var(--ink-soft);font-weight:700;margin-top:3px}
+  .wa-badge{margin-left:auto;display:inline-flex;align-items:center;gap:8px;
+    font-weight:800;font-size:13px;padding:8px 14px;border-radius:999px;
+    background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-sm);cursor:default}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .dot.on{background:var(--green);box-shadow:0 0 0 4px var(--green-soft)}
+  .dot.off{background:var(--amber);box-shadow:0 0 0 4px var(--amber-soft)}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+  /* ---------- reveal ---------- */
+  .reveal{opacity:0;transform:translateY(12px);animation:rise .6s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  /* ---------- onboarding ---------- */
+  .ob{max-width:640px;margin:0 auto}
+  .stepper{display:flex;gap:10px;margin:6px 0 22px}
+  .stepper .s{flex:1;height:6px;border-radius:999px;background:var(--cream-2)}
+  .stepper .s.done{background:var(--honey)}
+  .stepper .s.active{background:linear-gradient(90deg,var(--honey),#FFCE73)}
+  .panel{padding:34px}
+  .eyebrow{font-weight:800;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--honey-deep)}
+  .panel h2{font-size:30px;margin:8px 0 6px}
+  .lead{color:var(--ink-soft);font-size:15.5px;line-height:1.55;margin-bottom:22px}
+  label{display:block;font-weight:800;font-size:13px;margin:16px 0 7px;color:var(--ink)}
+  .hint{font-weight:600;color:var(--ink-faint);font-size:12.5px;margin-top:6px}
+  input,select,textarea{width:100%;font:inherit;font-weight:600;color:var(--ink);
+    background:var(--surface-tint);border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;outline:none;transition:.15s}
+  input:focus,select:focus,textarea:focus{border-color:var(--honey);background:#fff;box-shadow:0 0 0 4px var(--honey-soft)}
+  .row{display:flex;gap:12px}
+  .row>*{flex:1}
+  .btn{font:inherit;font-weight:800;cursor:pointer;border:none;border-radius:12px;padding:13px 20px;transition:.15s;display:inline-flex;align-items:center;gap:9px;justify-content:center}
+  .btn-primary{background:linear-gradient(160deg,#F4A521,#E08A0B);color:#fff;box-shadow:0 8px 18px -8px rgba(224,138,11,.85)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 22px -8px rgba(224,138,11,.9)}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1.5px solid var(--line)}
+  .btn-ghost:hover{background:var(--surface-tint);color:var(--ink)}
+  .btn-link{background:none;border:none;color:var(--honey-deep);font-weight:800;cursor:pointer;padding:0;text-decoration:underline;font-size:14px}
+  .actions{display:flex;gap:12px;align-items:center;margin-top:26px}
+  .actions .spacer{flex:1}
+
+  /* QR / pairing */
+  .pair{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+  .qr-box{background:#fff;border:1.5px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow-sm);width:236px;height:236px;display:grid;place-items:center}
+  .qr-box img{width:204px;height:204px;image-rendering:pixelated}
+  .qr-skel{width:100%;height:100%;border-radius:10px;background:linear-gradient(110deg,#F3E7CF 30%,#FBF3E4 50%,#F3E7CF 70%);background-size:200% 100%;animation:sh 1.3s linear infinite}
+  @keyframes sh{to{background-position:-200% 0}}
+  .steps-list{margin:0;padding-left:20px;color:var(--ink-soft);line-height:1.9;font-weight:600}
+  .steps-list b{color:var(--ink)}
+  .status-pill{display:inline-flex;align-items:center;gap:9px;font-weight:800;padding:9px 15px;border-radius:999px;margin-top:14px}
+  .status-pill.wait{background:var(--amber-soft);color:#9a6b07}
+  .status-pill.ok{background:var(--green-soft);color:#1f7a43}
+  .spin{width:13px;height:13px;border:2.5px solid #d8b870;border-top-color:transparent;border-radius:50%;animation:rot .8s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .codebox{font-family:'Fraunces',serif;font-weight:700;font-size:30px;letter-spacing:.18em;background:var(--surface-tint);border:1.5px dashed var(--honey);border-radius:12px;padding:14px 18px;text-align:center;color:var(--honey-deep)}
+
+  /* item list (menu builder + menu tab) */
+  .items{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .item{display:flex;align-items:center;gap:14px;background:var(--surface-tint);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .item .emoji{font-size:24px;width:34px;text-align:center}
+  .item .meta{flex:1;min-width:0}
+  .item .meta .nm{font-weight:800}
+  .item .meta .ds{color:var(--ink-faint);font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .price{font-weight:800;color:var(--honey-deep)}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:16px;padding:6px;border-radius:8px}
+  .icon-btn:hover{background:var(--red-soft);color:var(--red)}
+  .empty{text-align:center;color:var(--ink-faint);padding:34px 10px;font-weight:700}
+  .empty .ic{font-size:34px;display:block;margin-bottom:8px;opacity:.8}
+
+  /* ---------- main dashboard ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .stat{padding:18px 18px}
+  .stat .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+  .stat .v{font-family:'Fraunces',serif;font-weight:700;font-size:30px;margin-top:6px;line-height:1}
+  .stat .v.amber{color:var(--amber)} .stat .v.green{color:var(--green)} .stat .v.honey{color:var(--honey-deep)}
+  .tabs{display:flex;gap:6px;background:var(--cream-2);padding:6px;border-radius:14px;margin-bottom:18px;flex-wrap:wrap}
+  .tab{flex:1;min-width:90px;border:none;background:transparent;font:inherit;font-weight:800;color:var(--ink-soft);padding:11px;border-radius:10px;cursor:pointer;transition:.15s}
+  .tab.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
+  .view{padding:22px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);padding:10px 12px;border-bottom:1px solid var(--line)}
+  td{padding:13px 12px;border-bottom:1px solid var(--line);font-weight:600;font-size:14.5px}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;text-transform:capitalize}
+  .p-pending{background:var(--amber-soft);color:#9a6b07}.p-confirmed{background:var(--blue-soft);color:#1c6485}
+  .p-preparing,.p-delivering{background:var(--honey-soft);color:var(--honey-deep)}
+  .p-delivered{background:var(--green-soft);color:#1f7a43}.p-cancelled{background:var(--red-soft);color:var(--red)}
+  .mono{font-family:'Fraunces',serif;font-weight:700;background:var(--honey-soft);color:var(--honey-deep);padding:3px 9px;border-radius:8px}
+  .sec-head{display:flex;align-items:center;margin-bottom:14px}
+  .sec-head h3{font-size:19px}.sec-head .spacer{flex:1}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-weight:800;padding:13px 20px;border-radius:12px;box-shadow:var(--shadow);opacity:0;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .hidden{display:none!important}
+  @media(max-width:680px){.stats{grid-template-columns:repeat(2,1fr)}.pair{flex-direction:column}.panel{padding:24px}}
+</style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🐝 Hive Dashboard</h1>
-            <p id="businessName" style="color: #7f8c8d; margin-top: 10px;">Loading...</p>
-        </header>
-        
-        <div class="stats-grid" id="statsGrid">
-            <!-- Stats populated by JS -->
-        </div>
-        
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('orders')">📦 Orders</button>
-            <button class="tab" onclick="switchTab('menu')">📋 Menu</button>
-            <button class="tab" onclick="switchTab('vouchers')">🎟️ Vouchers</button>
-        </div>
-        
-        <div id="ordersPanel" class="panel active">
-            <h2 style="margin-bottom: 20px;">Recent Orders</h2>
-            <div id="ordersList"></div>
-        </div>
-        
-        <div id="menuPanel" class="panel">
-            <h2 style="margin-bottom: 20px;">Menu Items</h2>
-            <div id="menuList"></div>
-        </div>
-        
-        <div id="vouchersPanel" class="panel">
-            <h2 style="margin-bottom: 20px;">Vouchers</h2>
-            
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px;">Create New Voucher</h3>
-                <div class="form-group">
-                    <label>Amount</label>
-                    <input type="number" id="voucherAmount" placeholder="10.00" step="0.01" min="0.01">
-                </div>
-                <div class="form-group">
-                    <label>Code (optional - leave blank for random)</label>
-                    <input type="text" id="voucherCode" placeholder="WELCOME10">
-                </div>
-                <button onclick="createVoucher()">Create Voucher</button>
-            </div>
-            
-            <div id="vouchersList"></div>
-        </div>
+<div class="wrap">
+  <div class="brand reveal">
+    <div class="logo">🐝</div>
+    <div>
+      <h1 id="brandName">Hive</h1>
+      <div class="sub" id="brandSub">loading…</div>
     </div>
-    
-    <script>
-        let currentTab = 'orders';
-        let refreshInterval;
-        
-        async function fetchAPI(endpoint) {
-            const res = await fetch(`/api/${endpoint}`);
-            if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-            return res.json();
-        }
-        
-        async function loadStats() {
-            try {
-                const stats = await fetchAPI('stats');
-                const grid = document.getElementById('statsGrid');
-                grid.innerHTML = `
-                    <div class="stat-card">
-                        <h3>Total Orders</h3>
-                        <div class="stat-value">${stats.total_orders || 0}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Pending</h3>
-                        <div class="stat-value" style="color: #f39c12;">${stats.pending || 0}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Delivered</h3>
-                        <div class="stat-value" style="color: #27ae60;">${stats.delivered || 0}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Total Revenue</h3>
-                        <div class="stat-value">${stats.total_revenue ? stats.total_revenue.toFixed(2) : '0.00'}</div>
-                    </div>
-                `;
-            } catch (e) {
-                console.error('Failed to load stats:', e);
-            }
-        }
-        
-        async function loadOrders() {
-            try {
-                const orders = await fetchAPI('orders');
-                const list = document.getElementById('ordersList');
-                
-                if (!orders || orders.length === 0) {
-                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>No orders yet</p></div>';
-                    return;
-                }
-                
-                let html = '<table><thead><tr><th>ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody>';
-                orders.forEach(order => {
-                    const statusClass = `status-${order.status.toLowerCase()}`;
-                    html += `
-                        <tr>
-                            <td>#${order.id}</td>
-                            <td>${order.customer_jid ? order.customer_jid.split('@')[0] : 'Unknown'}</td>
-                            <td>${order.item_ids ? order.item_ids.split(',').length : 0} items</td>
-                            <td>${order.total_amount ? order.total_amount.toFixed(2) : '0.00'}</td>
-                            <td><span class="status-badge ${statusClass}">${order.status}</span></td>
-                        </tr>
-                    `;
-                });
-                html += '</tbody></table>';
-                list.innerHTML = html;
-            } catch (e) {
-                document.getElementById('ordersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load orders</p></div>';
-                console.error('Failed to load orders:', e);
-            }
-        }
-        
-        async function loadMenu() {
-            try {
-                const menu = await fetchAPI('menu');
-                const list = document.getElementById('menuList');
-                
-                if (!menu || menu.length === 0) {
-                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🍽️</div><p>No menu items</p></div>';
-                    return;
-                }
-                
-                let html = '';
-                menu.forEach(item => {
-                    html += `
-                        <div class="menu-item">
-                            <div class="menu-item-name">
-                                <span class="menu-item-emoji">${item.emoji || '📦'}</span>
-                                <div>
-                                    <div>${item.name}</div>
-                                    <div style="font-size: 0.9em; color: #7f8c8d;">${item.description || ''}</div>
-                                </div>
-                            </div>
-                            <div class="menu-item-price">${item.price.toFixed(2)}</div>
-                        </div>
-                    `;
-                });
-                list.innerHTML = html;
-            } catch (e) {
-                document.getElementById('menuList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load menu</p></div>';
-                console.error('Failed to load menu:', e);
-            }
-        }
-        
-        async function loadVouchers() {
-            try {
-                const vouchers = await fetchAPI('vouchers');
-                const list = document.getElementById('vouchersList');
-                
-                if (!vouchers || vouchers.length === 0) {
-                    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎟️</div><p>No vouchers created yet</p></div>';
-                    return;
-                }
-                
-                let html = '<table><thead><tr><th>Code</th><th>Amount</th><th>Redeemed</th><th>Created</th></tr></thead><tbody>';
-                vouchers.forEach(v => {
-                    const redeemed = v.redeemed_at ? '✓ Yes' : '✗ No';
-                    html += `
-                        <tr>
-                            <td><span class="voucher-code">${v.code}</span></td>
-                            <td>${v.amount.toFixed(2)}</td>
-                            <td>${redeemed}</td>
-                            <td>${new Date(v.created_at).toLocaleDateString()}</td>
-                        </tr>
-                    `;
-                });
-                html += '</tbody></table>';
-                list.innerHTML = html;
-            } catch (e) {
-                document.getElementById('vouchersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Failed to load vouchers</p></div>';
-                console.error('Failed to load vouchers:', e);
-            }
-        }
-        
-        async function createVoucher() {
-            const amount = parseFloat(document.getElementById('voucherAmount').value);
-            const code = document.getElementById('voucherCode').value.trim();
-            
-            if (!amount || amount <= 0) {
-                alert('Please enter a valid amount');
-                return;
-            }
-            
-            try {
-                const res = await fetch('/api/vouchers', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount, code: code || null })
-                });
-                
-                if (!res.ok) throw new Error('Failed to create voucher');
-                
-                const result = await res.json();
-                alert(`Voucher created! Code: ${result.code}`);
-                
-                document.getElementById('voucherAmount').value = '';
-                document.getElementById('voucherCode').value = '';
-                
-                loadVouchers();
-                loadStats();
-            } catch (e) {
-                alert('Failed to create voucher: ' + e.message);
-            }
-        }
-        
-        function switchTab(tab) {
-            // Update tabs
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // Update panels
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.getElementById(tab + 'Panel').classList.add('active');
-            
-            currentTab = tab;
-            loadTabData(tab);
-        }
-        
-        function loadTabData(tab) {
-            if (tab === 'orders') loadOrders();
-            else if (tab === 'menu') loadMenu();
-            else if (tab === 'vouchers') loadVouchers();
-        }
-        
-        // Initial load
-        async function init() {
-            await loadStats();
-            loadOrders();
-            
-            // Set business name in header (from first API call)
-            try {
-                const health = await fetchAPI('health');
-                // We don't have business name in health endpoint, could add it
-            } catch (e) {}
-            
-            // Auto-refresh every 10 seconds
-            refreshInterval = setInterval(() => {
-                loadStats();
-                loadTabData(currentTab);
-            }, 10000);
-        }
-        
-        init();
-    </script>
+    <div class="wa-badge" id="waBadge" title="WhatsApp connection">
+      <span class="dot off"></span><span id="waBadgeText">checking…</span>
+    </div>
+  </div>
+
+  <!-- ===================== ONBOARDING ===================== -->
+  <div id="onboarding" class="ob hidden">
+    <div class="stepper">
+      <div class="s" data-step="0"></div><div class="s" data-step="1"></div>
+      <div class="s" data-step="2"></div><div class="s" data-step="3"></div>
+    </div>
+    <div class="card reveal">
+
+      <!-- step 0: welcome -->
+      <div class="panel ob-step" data-step="0">
+        <div class="eyebrow">Welcome to Hive</div>
+        <h2>Let's get your shop on WhatsApp.</h2>
+        <p class="lead">In a few minutes you'll have a working WhatsApp bot that takes orders for your business — no cloud, no code. We'll set up your details, connect your WhatsApp, and add your menu.</p>
+        <div class="actions"><div class="spacer"></div><button class="btn btn-primary" onclick="go(1)">Get started →</button></div>
+      </div>
+
+      <!-- step 1: business -->
+      <div class="panel ob-step hidden" data-step="1">
+        <div class="eyebrow">Step 1 of 3</div>
+        <h2>About your business</h2>
+        <p class="lead">This is how you'll appear to your customers.</p>
+        <label>Business name</label>
+        <input id="bizName" placeholder="e.g. Mama's Kitchen" />
+        <div class="row">
+          <div>
+            <label>Currency</label>
+            <select id="bizCurrency">
+              <option>USD</option><option>KES</option><option>NGN</option><option>ZAR</option>
+              <option>GHS</option><option>TZS</option><option>UGX</option><option>EUR</option><option>GBP</option><option>INR</option>
+            </select>
+          </div>
+          <div>
+            <label>Your WhatsApp number <span style="font-weight:600;color:var(--ink-faint)">(for order alerts)</span></label>
+            <input id="bizAdmin" placeholder="+254712345678" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="go(0)">Back</button><div class="spacer"></div>
+          <button class="btn btn-primary" id="bizNext" onclick="saveBusiness()">Continue →</button>
+        </div>
+      </div>
+
+      <!-- step 2: connect whatsapp -->
+      <div class="panel ob-step hidden" data-step="2">
+        <div class="eyebrow">Step 2 of 3</div>
+        <h2>Connect WhatsApp</h2>
+        <p class="lead">Link the WhatsApp account your customers will message. This pairs Hive as a linked device — your chats stay on your phone.</p>
+        <div class="pair">
+          <div class="qr-box" id="qrBox"><div class="qr-skel"></div></div>
+          <div style="flex:1;min-width:240px">
+            <ol class="steps-list">
+              <li>Open <b>WhatsApp</b> on your phone</li>
+              <li>Tap <b>Settings → Linked Devices</b></li>
+              <li>Tap <b>Link a device</b></li>
+              <li>Scan this code</li>
+            </ol>
+            <div class="status-pill wait" id="waStatus"><span class="spin"></span> Waiting for scan…</div>
+            <div style="margin-top:16px">
+              <button class="btn-link" id="phoneToggle" onclick="togglePhone()">Use my phone number instead</button>
+            </div>
+            <div id="phoneArea" class="hidden" style="margin-top:12px">
+              <div class="row" style="align-items:flex-end">
+                <div><label style="margin-top:0">WhatsApp number</label><input id="pairPhone" placeholder="+254712345678" /></div>
+                <button class="btn btn-ghost" style="flex:0 0 auto" onclick="pairByPhone()">Get code</button>
+              </div>
+              <div id="pairCodeWrap" class="hidden" style="margin-top:12px">
+                <div class="hint">In WhatsApp choose <b>Link with phone number instead</b> and enter:</div>
+                <div class="codebox" id="pairCode" style="margin-top:8px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="go(1)">Back</button><div class="spacer"></div>
+          <button class="btn btn-primary" id="connNext" disabled onclick="go(3)">Continue →</button>
+        </div>
+      </div>
+
+      <!-- step 3: menu -->
+      <div class="panel ob-step hidden" data-step="3">
+        <div class="eyebrow">Step 3 of 3</div>
+        <h2>Add your first items</h2>
+        <p class="lead">Add what you sell. You can always change these later from the dashboard.</p>
+        <div class="row">
+          <div style="flex:0 0 70px"><label>Emoji</label><input id="miEmoji" placeholder="🍔" maxlength="4" /></div>
+          <div style="flex:2"><label>Name</label><input id="miName" placeholder="Cheeseburger" /></div>
+          <div style="flex:1"><label>Price</label><input id="miPrice" type="number" min="0" step="0.01" placeholder="9.50" /></div>
+        </div>
+        <label>Description <span style="font-weight:600;color:var(--ink-faint)">(optional)</span></label>
+        <input id="miDesc" placeholder="Beef patty, cheddar, house sauce" />
+        <div class="actions" style="margin-top:16px">
+          <button class="btn btn-primary" onclick="addItem()">+ Add item</button>
+          <button class="btn-link" onclick="loadExample()">Load an example menu</button>
+        </div>
+        <div class="items" id="obItems" style="margin-top:18px"></div>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="go(2)">Back</button><div class="spacer"></div>
+          <button class="btn btn-primary" id="menuFinish" onclick="finishOnboarding()">Finish setup ✓</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <div id="dashboard" class="hidden">
+    <div class="stats reveal" id="statsGrid"></div>
+    <div class="tabs reveal">
+      <button class="tab active" data-tab="orders" onclick="switchTab('orders')">📦 Orders</button>
+      <button class="tab" data-tab="menu" onclick="switchTab('menu')">🍽️ Menu</button>
+      <button class="tab" data-tab="vouchers" onclick="switchTab('vouchers')">🎟️ Vouchers</button>
+      <button class="tab" data-tab="payments" onclick="switchTab('payments')">💳 Payments</button>
+      <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
+    </div>
+    <div class="card reveal"><div class="view" id="tabView"></div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let CFG = null, WA = null, currentTab = 'orders', qrTimer = null, statusTimer = null;
+
+async function api(path, opts){
+  const r = await fetch('/api'+path, Object.assign({headers:{'Content-Type':'application/json'}}, opts||{}));
+  if(!r.ok) throw new Error((await r.text().catch(()=>''))||('HTTP '+r.status));
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function cur(){return (CFG&&CFG.business&&CFG.business.currency)||'USD';}
+function money(n){return cur()+' '+Number(n||0).toFixed(2);}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- boot ---------- */
+async function init(){
+  try{ CFG = await api('/config'); }catch(e){ CFG = {business:{name:''},menu_count:0,setup_complete:false}; }
+  await refreshWa();
+  paintBrand();
+  const businessSet = CFG.business && CFG.business.name;
+  if(!businessSet || !(WA&&WA.connected) || (CFG.menu_count||0)===0){
+    startOnboarding(businessSet, WA&&WA.connected, CFG.menu_count||0);
+  } else {
+    enterDashboard();
+  }
+  statusTimer = setInterval(refreshWa, 6000);
+}
+function paintBrand(){
+  const nm = (CFG.business&&CFG.business.name)||'Hive';
+  $('#brandName').textContent = nm==='Hive'?'Hive':nm;
+  $('#brandSub').textContent = nm==='Hive'?'WhatsApp commerce':'on Hive';
+}
+async function refreshWa(){
+  try{ WA = await api('/wa/status'); }catch(e){ WA = {connected:false,state:'disconnected'}; }
+  const on = WA.connected;
+  $('#waBadge').innerHTML = '<span class="dot '+(on?'on':'off')+'"></span><span>'+(on?'WhatsApp connected':'WhatsApp not linked')+'</span>';
+  // onboarding step 2 live updates
+  if(!document.getElementById('onboarding').classList.contains('hidden')){
+    const sp = $('#waStatus');
+    if(sp){
+      if(on){ sp.className='status-pill ok'; sp.innerHTML='✓ Connected'; $('#connNext').disabled=false; if(CURRENT===2){/* allow manual continue */} }
+      else { sp.className='status-pill wait'; sp.innerHTML='<span class="spin"></span> Waiting for scan…'; }
+    }
+  }
+}
+
+/* ---------- onboarding ---------- */
+let CURRENT = 0;
+function startOnboarding(businessSet, connected, menuCount){
+  $('#onboarding').classList.remove('hidden');
+  $('#dashboard').classList.add('hidden');
+  if(CFG.business){ $('#bizName').value=CFG.business.name||''; if(CFG.business.currency)$('#bizCurrency').value=CFG.business.currency; }
+  let start = 0;
+  if(businessSet) start = 1;
+  if(businessSet && !connected) start = 2;
+  if(businessSet && connected && menuCount===0) start = 3;
+  go(start===0?0:start);
+  if(start>=1) go(start);
+}
+function go(step){
+  CURRENT = step;
+  document.querySelectorAll('.ob-step').forEach(p=>p.classList.toggle('hidden', +p.dataset.step!==step));
+  document.querySelectorAll('.stepper .s').forEach(s=>{const i=+s.dataset.step;s.classList.toggle('done',i<step);s.classList.toggle('active',i===step);});
+  if(step===2) startQr(); else stopQr();
+  if(step===3) loadObItems();
+}
+async function saveBusiness(){
+  const name=$('#bizName').value.trim();
+  if(!name){toast('Please enter a business name');return;}
+  $('#bizNext').disabled=true;
+  try{
+    await api('/config/business',{method:'POST',body:JSON.stringify({
+      name, currency:$('#bizCurrency').value, admin_number:$('#bizAdmin').value.trim()||null
+    })});
+    CFG = await api('/config'); paintBrand(); go(2);
+  }catch(e){toast('Could not save: '+e.message);} finally{$('#bizNext').disabled=false;}
+}
+function startQr(){
+  const box=$('#qrBox');
+  const tick=()=>{ if(WA&&WA.connected){box.innerHTML='<div style="text-align:center"><div style="font-size:52px">✅</div><div style="font-weight:800;margin-top:8px;color:var(--green)">Linked!</div></div>';return;}
+    const img=new Image(); img.onload=()=>{box.innerHTML='';box.appendChild(img);}; img.onerror=()=>{}; img.src='/api/wa/qr.png?ts='+Date.now(); };
+  tick(); stopQr(); qrTimer=setInterval(tick,5000); refreshWa();
+}
+function stopQr(){ if(qrTimer){clearInterval(qrTimer);qrTimer=null;} }
+function togglePhone(){ $('#phoneArea').classList.toggle('hidden'); }
+async function pairByPhone(){
+  const phone=$('#pairPhone').value.trim(); if(!phone){toast('Enter your number');return;}
+  try{
+    const r=await api('/wa/pair',{method:'POST',body:JSON.stringify({method:'phone',phone})});
+    if(r&&r.pairing_code){ $('#pairCodeWrap').classList.remove('hidden'); $('#pairCode').textContent=r.pairing_code; }
+    else { toast('Pairing code requested — watch the screen'); setTimeout(refreshWa,1500); }
+  }catch(e){ toast(e.message.includes('501')?'Phone pairing not available — please scan the QR':'Error: '+e.message); }
+}
+
+/* menu builder (onboarding) */
+async function loadObItems(){ try{const items=await api('/menu'); renderItems('#obItems',items,true);}catch(e){} }
+async function addItem(){
+  const name=$('#miName').value.trim(); const price=parseFloat($('#miPrice').value);
+  if(!name||isNaN(price)){toast('Add a name and price');return;}
+  try{
+    await api('/menu',{method:'POST',body:JSON.stringify({name,price,emoji:$('#miEmoji').value.trim()||null,description:$('#miDesc').value.trim()||null})});
+    $('#miName').value='';$('#miPrice').value='';$('#miEmoji').value='';$('#miDesc').value='';
+    loadObItems(); CFG=await api('/config');
+  }catch(e){toast('Could not add: '+e.message);}
+}
+async function loadExample(){
+  const ex=[['🍔','Cheeseburger',9.5,'Beef, cheddar, house sauce'],['🍟','Fries',3.5,'Crispy, salted'],['🥤','Soda',2,'Coke / Sprite / Fanta']];
+  for(const [emoji,name,price,description] of ex){ try{await api('/menu',{method:'POST',body:JSON.stringify({emoji,name,price,description})});}catch(e){} }
+  loadObItems(); CFG=await api('/config'); toast('Example menu added');
+}
+async function finishOnboarding(){
+  CFG = await api('/config');
+  if((CFG.menu_count||0)===0){ toast('Add at least one item (or load the example)'); return; }
+  stopQr(); enterDashboard();
+}
+
+/* ---------- shared item rendering ---------- */
+function renderItems(sel,items,delOnly){
+  const el=$(sel);
+  if(!items||!items.length){el.innerHTML='<div class="empty"><span class="ic">🍽️</span>No items yet</div>';return;}
+  el.innerHTML=items.map(it=>`<div class="item">
+    <div class="emoji">${esc(it.emoji)||'🍽️'}</div>
+    <div class="meta"><div class="nm">${esc(it.name)}</div><div class="ds">${esc(it.description)||'&nbsp;'}</div></div>
+    <div class="price">${money(it.price)}</div>
+    <button class="icon-btn" title="Remove" onclick="delItem(${it.id})">✕</button>
+  </div>`).join('');
+}
+async function delItem(id){
+  try{ await api('/menu/'+id,{method:'DELETE'});
+    if(!$('#onboarding').classList.contains('hidden')) loadObItems(); else loadMenuTab();
+    CFG=await api('/config');
+  }catch(e){toast('Could not remove: '+e.message);}
+}
+
+/* ---------- dashboard ---------- */
+function enterDashboard(){
+  $('#onboarding').classList.add('hidden'); $('#dashboard').classList.remove('hidden');
+  loadStats(); switchTab('orders');
+  setInterval(()=>{loadStats(); if(currentTab==='orders')loadTab('orders');},10000);
+}
+async function loadStats(){
+  try{
+    const s=await api('/stats');
+    $('#statsGrid').innerHTML=[
+      ['Orders',s.total_orders ?? 0,'honey'],['Pending',s.pending_orders ?? 0,'amber'],
+      ['Delivered',s.delivered_orders ?? 0,'green'],['Revenue',money(s.total_revenue),'honey']
+    ].map(([k,v,c])=>`<div class="card stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+  }catch(e){}
+}
+function switchTab(t){
+  currentTab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  loadTab(t);
+}
+function loadTab(t){ ({orders:loadOrders,menu:loadMenuTab,vouchers:loadVouchers,payments:loadPayments,settings:loadSettings}[t]||loadOrders)(); }
+
+async function loadOrders(){
+  const v=$('#tabView');
+  try{
+    const o=await api('/orders');
+    if(!o.length){v.innerHTML='<div class="empty"><span class="ic">📭</span>No orders yet — share your WhatsApp number to start taking orders.</div>';return;}
+    v.innerHTML=`<div class="sec-head"><h3>Orders</h3></div><table><thead><tr><th>#</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody>${
+      o.map(r=>`<tr><td>#${r.id}</td><td>${esc(r.customer_phone||'')}</td><td>${esc((r.items_summary)||(r.items&&r.items.length)||'')}</td><td>${money(r.total)}</td><td><span class="pill p-${esc(r.status)}">${esc(r.status)}</span></td></tr>`).join('')
+    }</tbody></table>`;
+  }catch(e){v.innerHTML='<div class="empty"><span class="ic">⚠️</span>Could not load orders</div>';}
+}
+async function loadMenuTab(){
+  const v=$('#tabView');
+  v.innerHTML=`<div class="sec-head"><h3>Menu</h3><div class="spacer"></div></div>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:0 0 70px"><label style="margin-top:0">Emoji</label><input id="tEmoji" placeholder="🍔" maxlength="4"/></div>
+      <div style="flex:2"><label style="margin-top:0">Name</label><input id="tName" placeholder="Item name"/></div>
+      <div style="flex:1"><label style="margin-top:0">Price</label><input id="tPrice" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+      <button class="btn btn-primary" style="flex:0 0 auto" onclick="addItemTab()">+ Add</button>
+    </div>
+    <div class="items" id="menuItems" style="margin-top:16px"></div>`;
+  try{ renderItems('#menuItems', await api('/menu')); }catch(e){}
+}
+async function addItemTab(){
+  const name=$('#tName').value.trim(); const price=parseFloat($('#tPrice').value);
+  if(!name||isNaN(price)){toast('Add a name and price');return;}
+  try{ await api('/menu',{method:'POST',body:JSON.stringify({name,price,emoji:$('#tEmoji').value.trim()||null})}); loadMenuTab(); toast('Item added'); }
+  catch(e){toast('Could not add: '+e.message);}
+}
+async function loadVouchers(){
+  const v=$('#tabView');
+  v.innerHTML=`<div class="sec-head"><h3>Vouchers</h3></div>
+    <div class="row" style="align-items:flex-end;max-width:460px">
+      <div><label style="margin-top:0">Amount</label><input id="vAmt" type="number" min="0" step="0.01" placeholder="10.00"/></div>
+      <div><label style="margin-top:0">Code (optional)</label><input id="vCode" placeholder="auto"/></div>
+      <button class="btn btn-primary" style="flex:0 0 auto" onclick="createVoucher()">Create</button>
+    </div>
+    <div id="vList" style="margin-top:18px"></div>`;
+  await listVouchers();
+}
+async function listVouchers(){
+  try{
+    const vs=await api('/vouchers');
+    const el=$('#vList');
+    if(!vs.length){el.innerHTML='<div class="empty"><span class="ic">🎟️</span>No vouchers yet</div>';return;}
+    el.innerHTML=`<table><thead><tr><th>Code</th><th>Amount</th><th>Redeemed</th></tr></thead><tbody>${
+      vs.map(x=>`<tr><td><span class="mono">${esc(x.code)}</span></td><td>${money(x.amount)}</td><td>${x.redeemed_by||x.redeemed?'✅ yes':'—'}</td></tr>`).join('')}</tbody></table>`;
+  }catch(e){}
+}
+async function createVoucher(){
+  const amount=parseFloat($('#vAmt').value); if(isNaN(amount)||amount<=0){toast('Enter an amount');return;}
+  try{ const r=await api('/vouchers',{method:'POST',body:JSON.stringify({amount,code:$('#vCode').value.trim()||null})});
+    toast('Created '+(r&&r.code?r.code:'voucher')); $('#vAmt').value='';$('#vCode').value=''; listVouchers(); loadStats();
+  }catch(e){toast('Could not create: '+e.message);}
+}
+async function loadPayments(){
+  const v=$('#tabView');
+  v.innerHTML=`<div class="sec-head"><h3>Payments &amp; transaction history</h3><div class="spacer"></div>
+    <a class="btn btn-primary" href="/api/export/ledger" download="hive-transactions.json">⬇ Export transactions</a></div>
+    <div class="hint" id="payAnalytics" style="margin:0 0 16px">Loading…</div>
+    <div id="payList"></div>`;
+  try{
+    const a=await api('/analytics/payments'); const i=a.insights||{};
+    $('#payAnalytics').textContent=`${i.total_transactions??0} transactions · ${i.successful_transactions??0} successful · avg order ${i.avg_order_value||money(0)}`;
+  }catch(e){ $('#payAnalytics').textContent=''; }
+  try{
+    const ps=await api('/payments'); const el=$('#payList');
+    if(!ps.length){el.innerHTML='<div class="empty"><span class="ic">💳</span>No payments yet. Use “Export transactions” anytime to download your full ledger.</div>';return;}
+    el.innerHTML=`<table><thead><tr><th>#</th><th>Order</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead><tbody>${
+      ps.map(p=>`<tr><td>#${esc(p.id)}</td><td>${esc(p.order_id)}</td><td>${money(p.amount)}</td><td>${esc(p.method)}</td><td><span class="pill p-${esc(String(p.status||'').toLowerCase())}">${esc(p.status)}</span></td></tr>`).join('')}</tbody></table>`;
+  }catch(e){ $('#payList').innerHTML='<div class="empty"><span class="ic">⚠️</span>Could not load payments</div>'; }
+}
+function loadSettings(){
+  const b=(CFG&&CFG.business)||{};
+  const v=$('#tabView');
+  v.innerHTML=`<div class="sec-head"><h3>Business settings</h3></div>
+    <label>Business name</label><input id="sName" value="${esc(b.name)}"/>
+    <div class="row"><div><label>Currency</label><input id="sCur" value="${esc(b.currency)}"/></div>
+      <div><label>Admin WhatsApp number</label><input id="sAdmin" value="${esc((CFG.admin_numbers&&CFG.admin_numbers[0])||'')}"/></div></div>
+    <label>Welcome message</label><textarea id="sWelcome" rows="3">${esc(b.welcome)}</textarea>
+    <div class="actions"><button class="btn btn-primary" onclick="saveSettings()">Save changes</button></div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:28px 0"/>
+    <div class="sec-head"><h3>WhatsApp</h3></div>
+    <p class="lead" style="margin-bottom:14px">${WA&&WA.connected?'✅ Connected and ready to take orders.':'⚠️ Not linked. Re-link to start receiving messages.'}</p>
+    <div class="actions" style="margin-top:0">
+      ${WA&&WA.connected?'<button class="btn btn-ghost" onclick="logoutWa()">Unlink WhatsApp</button>':'<button class="btn btn-primary" onclick="relink()">Link WhatsApp</button>'}
+    </div>`;
+}
+async function saveSettings(){
+  try{ await api('/config/business',{method:'POST',body:JSON.stringify({
+    name:$('#sName').value.trim(), currency:$('#sCur').value.trim(), welcome:$('#sWelcome').value, admin_number:$('#sAdmin').value.trim()||null
+  })}); CFG=await api('/config'); paintBrand(); toast('Saved'); }
+  catch(e){toast('Could not save: '+e.message);}
+}
+async function logoutWa(){ try{await api('/wa/logout',{method:'POST'}); toast('Unlinked'); setTimeout(()=>location.reload(),800);}catch(e){toast('Could not unlink');} }
+function relink(){ $('#dashboard').classList.add('hidden'); $('#onboarding').classList.remove('hidden'); go(2); }
+
+init();
+</script>
 </body>
 </html>
