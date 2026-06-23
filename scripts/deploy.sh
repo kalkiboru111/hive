@@ -14,8 +14,9 @@ KEYSTORE="${KEYSTORE:?set KEYSTORE to your rApp key .p12 (see keytool generate)}
 KEY_ALIAS="${KEY_ALIAS:?set KEY_ALIAS}"
 KEY_PASSWORD="${KEY_PASSWORD:?set KEY_PASSWORD}"
 
-L0_URL="${L0_URL:-http://143.110.227.9:9000}"        # Reality testnet genesis L0
-DESTINATION="${DESTINATION:?set DESTINATION to the deploy NET address (ask your operator)}"
+L0_URL="${L0_URL:-http://143.110.227.9:9100}"        # transactions endpoint (snapshots are on :9000)
+# Reality testnet genesis address (build 1100, chain rebuilt 2026-06-11):
+DESTINATION="${DESTINATION:-NET8Q7Y4oZxXwZZz5Qze3y9tHDs9PP8TprEZJ8yf}"
 
 APP_BINARY="${APP_BINARY:?set APP_BINARY to the local Hive binary (its SHA-256 is recorded)}"
 APP_NAME="${APP_NAME:-my-hive-bot}"

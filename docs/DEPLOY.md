@@ -37,10 +37,20 @@ This keypair *is* your rApp identity; its address is your rApp address.
 `create-deploy-app-transaction` signs the tx with your keystore and writes it to `--nextTxPath`
 (it computes `binaryHash` from `--appDataPath` itself):
 
+`--destination` is the **Reality testnet genesis address**:
+`NET8Q7Y4oZxXwZZz5Qze3y9tHDs9PP8TprEZJ8yf` (chain rebuilt 2026-06-11, build 1100).
+
+> **Token amounts are raw ×1e8 units**, and the network enforces a partition rule:
+> `startingBalances + totalRewards + tokensForSale == totalSupply`. The wallet CLI sends
+> **empty** startingBalances, so with it you must set `totalRewards + tokensForSale == totalSupply`.
+> To allocate a starting balance to the deployer, use a Scala one-shot instead — see the
+> known-good references `CreateDeployAppTx.scala` / `CreateChainstatsDeployAppTx.scala` in the
+> sentiment-reality repo (run via `sbt "runMain CreateDeployAppTx <out>"`).
+
 ```bash
 java -jar wallet.jar create-deploy-app-transaction \
   --keystore key.p12 --alias <alias> --password <password> \
-  --destination <DESTINATION_NET_ADDRESS> \
+  --destination NET8Q7Y4oZxXwZZz5Qze3y9tHDs9PP8TprEZJ8yf \
   --appDataPath ./hive \
   --appName "my-hive-bot" \
   --appVersion "0.2.0" \
@@ -56,8 +66,11 @@ java -jar wallet.jar create-deploy-app-transaction \
 
 ### 3. Post it to the testnet L0
 
+Transactions are posted to the **`:9100`** endpoint (the global L0 cluster/snapshot API is on
+`:9000`; both are live):
+
 ```bash
-curl -X POST http://143.110.227.9:9000/transactions \
+curl -X POST http://143.110.227.9:9100/transactions \
   -H 'Content-Type: application/json' \
   --data @./deploy-tx.json
 ```
