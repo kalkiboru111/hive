@@ -296,14 +296,29 @@ impl HiveConfig {
         Ok(config)
     }
 
+    /// Save the config back to `config.yaml` in the given directory.
+    ///
+    /// Used by the dashboard onboarding/edit flows to persist business and menu
+    /// changes; `config.yaml` remains the source of truth.
+    pub fn save(&self, project_dir: &Path) -> Result<()> {
+        let config_path = project_dir.join("config.yaml");
+        let yaml = serde_yaml::to_string(self).context("Failed to serialize config")?;
+        std::fs::write(&config_path, yaml)
+            .with_context(|| format!("Failed to write {}", config_path.display()))?;
+        Ok(())
+    }
+
+    /// Whether the operator has finished setup (business named + at least one
+    /// menu item). WhatsApp pairing is tracked separately by the dashboard.
+    pub fn setup_complete(&self) -> bool {
+        !self.business.name.trim().is_empty() && !self.menu.is_empty()
+    }
+
     /// Validate the config for common mistakes.
+    ///
+    /// Note: empty `business.name` and empty `menu` are allowed — a brand-new
+    /// project boots into the dashboard onboarding flow, which fills them in.
     pub fn validate(&self) -> Result<()> {
-        if self.business.name.is_empty() {
-            anyhow::bail!("business.name cannot be empty");
-        }
-        if self.menu.is_empty() {
-            anyhow::bail!("menu must contain at least one item");
-        }
         for (i, item) in self.menu.iter().enumerate() {
             if item.name.is_empty() {
                 anyhow::bail!("menu[{}].name cannot be empty", i);

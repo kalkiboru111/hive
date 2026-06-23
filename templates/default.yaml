@@ -2,8 +2,10 @@
 # Edit this file to customize your WhatsApp bot.
 # See examples/cloudy-deliveries/config.yaml for a complete example.
 
+# A blank starting point. Run `hive run <this dir>` and open the dashboard —
+# the onboarding wizard will set your business name and build your menu for you.
 business:
-  name: "My Business"
+  name: ""
   currency: "USD"
   welcome: |
     Welcome! 👋
@@ -14,15 +16,8 @@ business:
     3. 🎟️ Redeem Voucher
     4. ℹ️ About Us
 
-menu:
-  - name: "Item 1"
-    price: 10.00
-    emoji: "🍕"
-    description: "Your first menu item"
-  - name: "Item 2"
-    price: 15.00
-    emoji: "🍔"
-    description: "Your second menu item"
+# Empty to start — add items from the dashboard (onboarding).
+menu: []
 
 # Uncomment and configure delivery settings:
 # delivery:

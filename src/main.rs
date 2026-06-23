@@ -316,7 +316,13 @@ async fn cmd_run(path: &PathBuf, phone: Option<String>) -> Result<()> {
     let config = config::HiveConfig::load(path)
         .with_context(|| format!("Failed to load config from {}", path.display()))?;
 
-    info!("🐝 Starting Hive bot for \"{}\"", config.business.name);
+    if config.setup_complete() {
+        info!("🐝 Starting Hive bot for \"{}\"", config.business.name);
+    } else {
+        info!("🐝 Starting Hive — project not set up yet; open the dashboard to onboard");
+    }
+
+    let dashboard_enabled = config.dashboard.enabled;
 
     // Initialize SQLite store
     let db_path = path.join("data").join("hive.db");
@@ -324,16 +330,33 @@ async fn cmd_run(path: &PathBuf, phone: Option<String>) -> Result<()> {
     let store = store::Store::new(db_path.to_str().unwrap())
         .with_context(|| "Failed to initialize database")?;
 
-    // Create shared WhatsApp client (populated after bot connects)
+    // Live, swappable config shared between bot and dashboard.
+    let shared_config = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(config));
+    // Shared WhatsApp client (populated after bot connects) + live pairing state.
     let wa_client_shared = std::sync::Arc::new(tokio::sync::RwLock::new(None));
+    let wa_pairing = std::sync::Arc::new(tokio::sync::RwLock::new(bot::WaPairing::default()));
+    // Control channel: dashboard → bot (pair-by-phone / logout / reset).
+    let (wa_control_tx, wa_control_rx) = tokio::sync::mpsc::unbounded_channel::<bot::WaControl>();
 
     // Start dashboard in background if enabled
-    let dashboard_handle = if config.dashboard.enabled {
-        let dashboard_config = config.clone();
+    let dashboard_handle = if dashboard_enabled {
+        let dashboard_config = shared_config.clone();
         let dashboard_store = store.clone();
         let dashboard_client = wa_client_shared.clone();
+        let dashboard_pairing = wa_pairing.clone();
+        let dashboard_dir = path.clone();
+        let dashboard_control = wa_control_tx.clone();
         Some(tokio::spawn(async move {
-            if let Err(e) = dashboard::run_dashboard(dashboard_config, dashboard_store, dashboard_client).await {
+            if let Err(e) = dashboard::run_dashboard(
+                dashboard_config,
+                dashboard_store,
+                dashboard_client,
+                dashboard_pairing,
+                dashboard_dir,
+                dashboard_control,
+            )
+            .await
+            {
                 log::error!("Dashboard error: {}", e);
             }
         }))
@@ -342,11 +365,14 @@ async fn cmd_run(path: &PathBuf, phone: Option<String>) -> Result<()> {
     };
 
     // Start the WhatsApp bot
-    let mut engine = bot::BotEngine::new(config, store, path.clone()).await?;
+    let mut engine = bot::BotEngine::new(shared_config, store, path.clone()).await?;
     if let Some(phone) = phone {
         engine = engine.with_phone_number(phone);
     }
-    engine = engine.with_wa_client_shared(wa_client_shared);
+    engine = engine
+        .with_wa_client_shared(wa_client_shared)
+        .with_wa_pairing(wa_pairing)
+        .with_wa_control(wa_control_rx);
     engine.run().await?;
 
     // Wait for dashboard if it was started
@@ -371,8 +397,22 @@ async fn cmd_dashboard(path: &PathBuf) -> Result<()> {
         config.business.name, config.dashboard.port
     );
 
-    // Dashboard-only mode: no WhatsApp client (webhooks won't send notifications)
+    // Dashboard-only mode: no WhatsApp bot runs, so pairing can't happen here —
+    // use `hive run` to pair. wa_client/pairing stay at their idle defaults.
+    let shared_config = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(config));
     let wa_client_shared = std::sync::Arc::new(tokio::sync::RwLock::new(None));
+    let wa_pairing = std::sync::Arc::new(tokio::sync::RwLock::new(bot::WaPairing::default()));
+    // No bot in dashboard-only mode: the receiver is dropped, so pair/logout
+    // requests return 503 (use `hive run` to pair).
+    let (wa_control_tx, _wa_control_rx) = tokio::sync::mpsc::unbounded_channel::<bot::WaControl>();
 
-    dashboard::run_dashboard(config, store, wa_client_shared).await
+    dashboard::run_dashboard(
+        shared_config,
+        store,
+        wa_client_shared,
+        wa_pairing,
+        path.clone(),
+        wa_control_tx,
+    )
+    .await
 }
