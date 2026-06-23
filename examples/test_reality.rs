@@ -31,9 +31,15 @@ async fn main() -> anyhow::Result<()> {
     let ordinal = client.latest_ordinal().await?;
     println!("  ✅ Ordinal: {}", ordinal);
 
-    // 3. Generate identity
-    println!("\n── Step 3: Generate node identity ──");
-    let identity = NodeIdentity::generate()?;
+    // 3. Identity — use REALITY_KEY_HEX (e.g. the deployed rApp key) if provided
+    println!("\n── Step 3: Node identity ──");
+    let identity = match std::env::var("REALITY_KEY_HEX") {
+        Ok(hex) if !hex.trim().is_empty() => {
+            println!("  Using provided key (REALITY_KEY_HEX)");
+            NodeIdentity::from_secret_key_hex(hex.trim())?
+        }
+        _ => NodeIdentity::generate()?,
+    };
     println!("  ✅ Peer ID: {}...", &identity.peer_id_hex[..32]);
     println!("  ✅ Address: {}", identity.address);
 

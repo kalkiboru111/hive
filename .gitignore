@@ -15,3 +15,9 @@ data/
 .vscode/
 *.swp
 *.swo
+
+# Reality SDK jar for the deploy tool (drop it in manually; do not commit ~151MB)
+deploy/lib/*.jar
+deploy/target/
+deploy/project/target/
+deploy/project/project/
